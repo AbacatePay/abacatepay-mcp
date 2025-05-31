@@ -32,7 +32,7 @@ export function registerCouponTools(server: McpServer) {
           requestBody.metadata = metadata;
         }
 
-        const response = await makeAbacatePayRequest<any>("coupon/create", {
+        const response = await makeAbacatePayRequest<any>("/coupon/create", {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -80,7 +80,7 @@ export function registerCouponTools(server: McpServer) {
     {},
     async () => {
       try {
-        const response = await makeAbacatePayRequest<any>("coupon/list", {
+        const response = await makeAbacatePayRequest<any>("/coupon/list", {
           method: "GET"
         });
 

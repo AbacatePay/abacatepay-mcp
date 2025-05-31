@@ -35,7 +35,7 @@ export function registerPixTools(server: McpServer) {
           requestBody.customer = customer;
         }
 
-        const response = await makeAbacatePayRequest<any>("pixQrCode/create", {
+        const response = await makeAbacatePayRequest<any>("/pixQrCode/create", {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -90,7 +90,7 @@ export function registerPixTools(server: McpServer) {
           requestBody.metadata = metadata;
         }
 
-        const response = await makeAbacatePayRequest<any>(`pixQrCode/simulate-payment?id=${id}`, {
+        const response = await makeAbacatePayRequest<any>(`/pixQrCode/simulate-payment?id=${id}`, {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -147,7 +147,7 @@ export function registerPixTools(server: McpServer) {
     },
     async ({ id }) => {
       try {
-        const response = await makeAbacatePayRequest<any>(`pixQrCode/check?id=${id}`, {
+        const response = await makeAbacatePayRequest<any>(`/pixQrCode/check?id=${id}`, {
           method: "GET"
         });
 

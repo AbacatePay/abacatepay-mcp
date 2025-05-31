@@ -14,7 +14,7 @@ export function registerCustomerTools(server: McpServer) {
     },
     async ({ name, cellphone, email, taxId }) => {
       try {
-        const response = await makeAbacatePayRequest<any>("customer/create", {
+        const response = await makeAbacatePayRequest<any>("/customer/create", {
           method: "POST",
           body: JSON.stringify({
             name,
@@ -51,7 +51,7 @@ export function registerCustomerTools(server: McpServer) {
     {},
     async () => {
       try {
-        const response = await makeAbacatePayRequest<any>("customer/list", {
+        const response = await makeAbacatePayRequest<any>("/customer/list", {
           method: "GET"
         });
 

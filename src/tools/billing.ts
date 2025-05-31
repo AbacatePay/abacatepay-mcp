@@ -34,7 +34,7 @@ export function registerBillingTools(server: McpServer) {
           requestBody.customerId = customerId;
         }
 
-        const response = await makeAbacatePayRequest<any>("billing/create", {
+        const response = await makeAbacatePayRequest<any>("/billing/create", {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -78,7 +78,7 @@ export function registerBillingTools(server: McpServer) {
     {},
     async () => {
       try {
-        const response = await makeAbacatePayRequest<any>("billing/list", {
+        const response = await makeAbacatePayRequest<any>("/billing/list", {
           method: "GET"
         });
 
