@@ -7,6 +7,7 @@ export function registerCouponTools(server: McpServer) {
     "createCoupon",
     "Cria um novo cupom de desconto",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       code: z.string().describe("Código único do cupom (ex: DESCONTO20)"),
       discountKind: z.enum(["PERCENTAGE", "FIXED"]).describe("Tipo de desconto: PERCENTAGE (porcentagem) ou FIXED (valor fixo)"),
       discount: z.number().describe("Valor do desconto (em % para PERCENTAGE ou em centavos para FIXED)"),
@@ -14,7 +15,8 @@ export function registerCouponTools(server: McpServer) {
       maxRedeems: z.number().default(-1).describe("Quantidade máxima de usos (-1 para ilimitado)"),
       metadata: z.object({}).optional().describe("Metadados adicionais do cupom")
     },
-    async ({ code, discountKind, discount, notes, maxRedeems, metadata }) => {
+    async (params) => {
+      const { apiKey, code, discountKind, discount, notes, maxRedeems, metadata } = params as any;
       try {
         const requestBody: any = {
           code,
@@ -32,7 +34,7 @@ export function registerCouponTools(server: McpServer) {
           requestBody.metadata = metadata;
         }
 
-        const response = await makeAbacatePayRequest<any>("/coupon/create", {
+        const response = await makeAbacatePayRequest<any>("/coupon/create", apiKey, {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -76,11 +78,14 @@ export function registerCouponTools(server: McpServer) {
 
   server.tool(
     "listCoupons",
-    "Lista todos os cupons de desconto criados",
-    {},
-    async () => {
+    "Lista todos os cupons de desconto criados no Abacate Pay",
+    {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)")
+    },
+    async (params) => {
+      const { apiKey } = params as any;
       try {
-        const response = await makeAbacatePayRequest<any>("/coupon/list", {
+        const response = await makeAbacatePayRequest<any>("/coupon/list", apiKey, {
           method: "GET"
         });
 

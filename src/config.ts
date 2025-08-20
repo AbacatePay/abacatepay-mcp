@@ -2,23 +2,23 @@ import minimist from "minimist";
 
 const argv = minimist(process.argv.slice(2));
 
+// API key can be provided globally (legacy mode) or per request (multi-tenant mode)
 export const apiKey = argv.key || process.env.ABACATE_PAY_API_KEY;
 
 export function validateApiKey(): string {
   if (!apiKey) {
     console.error(
-      "❌ Chave de API não fornecida.\n" +
-      "Use uma das opções:\n" +
+      "⚠️  Chave de API não fornecida globalmente.\n" +
+      "O servidor suporta multi-tenancy e requer a chave de API em cada requisição.\n" +
+      "Para usar o modo legacy (chave global), configure:\n" +
       "  1. --key sua_chave_aqui\n" +
-      "  2. Variável de ambiente ABACATE_PAY_API_KEY\n" +
-      "  3. Configure no claude_desktop_config.json"
+      "  2. Variável de ambiente ABACATE_PAY_API_KEY"
     );
-    process.exit(1);
   }
-  return apiKey;
+  return apiKey || '';
 }
 
-// Só valida se estamos executando como script principal (não durante importação para testes)
+// Só valida se estamos executando como script principal
 const isMainModule = process.argv[1] && (
   process.argv[1].endsWith('index.js') || 
   process.argv[1].endsWith('dist/index.js') ||
@@ -26,8 +26,12 @@ const isMainModule = process.argv[1] && (
 );
 
 if (isMainModule && !process.env.NODE_ENV?.includes('test')) {
-  validateApiKey();
   console.error("✅ Abacate Pay MCP Server iniciado com sucesso");
+  if (apiKey) {
+    console.error("🔑 Modo legacy ativo - API key global configurada");
+  } else {
+    console.error("🔐 Multi-tenancy ativo - API keys devem ser fornecidas em cada requisição");
+  }
 }
 
 export const ABACATE_PAY_API_BASE = "https://api.abacatepay.com/v1";

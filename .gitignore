@@ -6,6 +6,10 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+bun-debug.log*
+
+# Bun
+bun.lockb
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -71,6 +75,11 @@ web_modules/
 
 # Yarn Integrity file
 .yarn-integrity
+
+# Node.js lock files (using Bun now)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # dotenv environment variable files
 .env

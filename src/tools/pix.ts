@@ -7,6 +7,7 @@ export function registerPixTools(server: McpServer) {
     "createPixQrCode",
     "Cria um QR Code PIX para pagamento direto",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       amount: z.number().describe("Valor da cobrança em centavos"),
       expiresIn: z.number().optional().describe("Tempo de expiração em segundos (opcional)"),
       description: z.string().max(140).optional().describe("Mensagem que aparecerá no pagamento PIX (máx 140 caracteres)"),
@@ -17,7 +18,8 @@ export function registerPixTools(server: McpServer) {
         taxId: z.string().describe("CPF ou CNPJ do cliente")
       }).optional().describe("Dados do cliente (opcional)")
     },
-    async ({ amount, expiresIn, description, customer }) => {
+    async (params) => {
+      const { apiKey, amount, expiresIn, description, customer } = params as any;
       try {
         const requestBody: any = {
           amount
@@ -35,7 +37,7 @@ export function registerPixTools(server: McpServer) {
           requestBody.customer = customer;
         }
 
-        const response = await makeAbacatePayRequest<any>("/pixQrCode/create", {
+        const response = await makeAbacatePayRequest<any>("/pixQrCode/create", apiKey, {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -79,10 +81,12 @@ export function registerPixTools(server: McpServer) {
     "simulatePixPayment",
     "Simula o pagamento de um QR Code PIX (apenas em modo desenvolvimento)",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       id: z.string().describe("ID do QR Code PIX para simular o pagamento"),
       metadata: z.object({}).optional().describe("Metadados opcionais para a requisição")
     },
-    async ({ id, metadata }) => {
+    async (params) => {
+      const { apiKey, id, metadata } = params as any;
       try {
         const requestBody: any = {};
 
@@ -90,7 +94,7 @@ export function registerPixTools(server: McpServer) {
           requestBody.metadata = metadata;
         }
 
-        const response = await makeAbacatePayRequest<any>(`/pixQrCode/simulate-payment?id=${id}`, {
+        const response = await makeAbacatePayRequest<any>(`/pixQrCode/simulate-payment?id=${id}`, apiKey, {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -143,11 +147,13 @@ export function registerPixTools(server: McpServer) {
     "checkPixStatus",
     "Verifica o status de um QR Code PIX",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       id: z.string().describe("ID do QR Code PIX para verificar o status")
     },
-    async ({ id }) => {
+    async (params) => {
+      const { apiKey, id } = params as any;
       try {
-        const response = await makeAbacatePayRequest<any>(`/pixQrCode/check?id=${id}`, {
+        const response = await makeAbacatePayRequest<any>(`/pixQrCode/check?id=${id}`, apiKey, {
           method: "GET"
         });
 

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  abacatepay-mcp:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_PORT=3000
+      - ABACATE_PAY_API_KEY=${ABACATE_PAY_API_KEY}
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - /app/node_modules
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 500M
+        reservations:
+          cpus: '0.5'
+          memory: 250M

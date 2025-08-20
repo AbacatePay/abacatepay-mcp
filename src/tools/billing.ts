@@ -7,6 +7,7 @@ export function registerBillingTools(server: McpServer) {
     "createBilling",
     "Cria uma nova cobrança no Abacate Pay",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       frequency: z.enum(["ONE_TIME", "MULTIPLE_PAYMENTS"]).default("ONE_TIME").describe("Tipo de frequência da cobrança"),
       methods: z.array(z.enum(["PIX"])).default(["PIX"]).describe("Métodos de pagamento (atualmente apenas PIX)"),
       products: z.array(z.object({
@@ -20,7 +21,8 @@ export function registerBillingTools(server: McpServer) {
       completionUrl: z.string().url().describe("URL para redirecionar quando o pagamento for concluído"),
       customerId: z.string().optional().describe("ID de um cliente já cadastrado (opcional)")
     },
-    async ({ frequency, methods, products, returnUrl, completionUrl, customerId }) => {
+    async (params) => {
+      const { apiKey, frequency, methods, products, returnUrl, completionUrl, customerId } = params as any;
       try {
         const requestBody: any = {
           frequency,
@@ -34,7 +36,7 @@ export function registerBillingTools(server: McpServer) {
           requestBody.customerId = customerId;
         }
 
-        const response = await makeAbacatePayRequest<any>("/billing/create", {
+        const response = await makeAbacatePayRequest<any>("/billing/create", apiKey, {
           method: "POST",
           body: JSON.stringify(requestBody)
         });
@@ -75,10 +77,13 @@ export function registerBillingTools(server: McpServer) {
   server.tool(
     "listBillings",
     "Lista todas as cobranças criadas no Abacate Pay",
-    {},
-    async () => {
+    {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)")
+    },
+    async (params) => {
+      const { apiKey } = params as any;
       try {
-        const response = await makeAbacatePayRequest<any>("/billing/list", {
+        const response = await makeAbacatePayRequest<any>("/billing/list", apiKey, {
           method: "GET"
         });
 
