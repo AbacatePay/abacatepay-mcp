@@ -1,8 +1,7 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import inquirer from 'inquirer';
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -12,31 +11,6 @@ const projectRoot = join(__dirname, '..');
 
 console.log('🥑 Abacate Pay MCP Inspector');
 console.log('================================\n');
-
-async function checkAndBuild() {
-    const distPath = join(projectRoot, 'dist', 'index.js');
-    
-    if (!existsSync(distPath)) {
-        console.log('❌ Projeto não compilado. Compilando agora...');
-        
-        return new Promise((resolve, reject) => {
-            const build = spawn('npm', ['run', 'build'], { 
-                cwd: projectRoot, 
-                stdio: 'inherit' 
-            });
-            
-            build.on('close', (code) => {
-                if (code === 0) {
-                    console.log('✅ Projeto compilado com sucesso!\n');
-                    resolve();
-                } else {
-                    console.log('❌ Erro ao compilar o projeto. Verifique se as dependências estão instaladas (npm install)');
-                    reject(new Error('Build failed'));
-                }
-            });
-        });
-    }
-}
 
 async function getApiKey() {
     // Verifica se já existe na variável de ambiente
@@ -73,10 +47,10 @@ async function startInspector(apiKey) {
         console.log('   export ABACATE_PAY_API_KEY="sua_chave_aqui"\n');
     }
     
-    const inspector = spawn('npx', [
+    const inspector = spawn('bunx', [
         '@modelcontextprotocol/inspector', 
-        'node', 
-        'dist/index.js'
+        'bun', 
+        'src/index.ts'
     ], {
         cwd: projectRoot,
         stdio: 'inherit',
@@ -95,7 +69,6 @@ async function startInspector(apiKey) {
 
 async function main() {
     try {
-        await checkAndBuild();
         const apiKey = await getApiKey();
         await startInspector(apiKey);
     } catch (error) {

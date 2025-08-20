@@ -7,14 +7,16 @@ export function registerCustomerTools(server: McpServer) {
     "createCustomer",
     "Cria um novo cliente no Abacate Pay",
     {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)"),
       name: z.string().describe("Nome completo do cliente"),
       cellphone: z.string().describe("Celular do cliente (ex: (11) 4002-8922)"),
       email: z.string().email().describe("E-mail do cliente"),
       taxId: z.string().describe("CPF ou CNPJ válido do cliente (ex: 123.456.789-01)")
     },
-    async ({ name, cellphone, email, taxId }) => {
+    async (params) => {
+      const { apiKey, name, cellphone, email, taxId } = params as any;
       try {
-        const response = await makeAbacatePayRequest<any>("/customer/create", {
+        const response = await makeAbacatePayRequest<any>("/customer/create", apiKey, {
           method: "POST",
           body: JSON.stringify({
             name,
@@ -48,10 +50,13 @@ export function registerCustomerTools(server: McpServer) {
   server.tool(
     "listCustomers",
     "Lista todos os clientes cadastrados no Abacate Pay",
-    {},
-    async () => {
+    {
+      apiKey: z.string().optional().describe("Chave de API do Abacate Pay (opcional se configurada globalmente)")
+    },
+    async (params) => {
+      const { apiKey } = params as any;
       try {
-        const response = await makeAbacatePayRequest<any>("/customer/list", {
+        const response = await makeAbacatePayRequest<any>("/customer/list", apiKey, {
           method: "GET"
         });
 
