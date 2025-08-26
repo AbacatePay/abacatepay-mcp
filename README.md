@@ -1,116 +1,50 @@
-# 🥑 Abacate Pay MCP Server
+# Building a Remote MCP Server on Cloudflare (Without Auth)
 
-Um servidor MCP (Model Context Protocol) para integração com a API do Abacate Pay, permitindo gerenciar pagamentos, clientes e cobranças diretamente através de assistentes de IA como Claude e Cursor.
+This example allows you to deploy a remote MCP server that doesn't require authentication on Cloudflare Workers. 
 
-## O que você pode fazer
+## Get started: 
 
-- 👥 **Gerenciar clientes**: Criar e listar clientes
-- 💰 **Criar cobranças**: Links de pagamento e faturas  
-- 📱 **QR Codes PIX**: Pagamentos instantâneos
-- 🎫 **Cupons de desconto**: Promoções e descontos
-- 🔄 **Simular pagamentos**: Testar fluxos em desenvolvimento
+[![Deploy to Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-authless)
 
-## 🚀 Instalação e Configuração
+This will deploy your MCP server to a URL like: `remote-mcp-server-authless.<your-account>.workers.dev/sse`
 
-### 1. Clone o repositório
-
+Alternatively, you can use the command line below to get the remote MCP Server created on your local machine:
 ```bash
-git clone https://github.com/AbacatePay/abacatepay-mcp.git
-cd abacatepay-mcp
-npm install
-npm run build
+npm create cloudflare@latest -- my-mcp-server --template=cloudflare/ai/demos/remote-mcp-authless
 ```
 
-### 2. Configure no Claude Desktop
+## Customizing your MCP Server
 
-Adicione ao seu `claude_desktop_config.json`:
+To add your own [tools](https://developers.cloudflare.com/agents/model-context-protocol/tools/) to the MCP server, define each tool inside the `init()` method of `src/index.ts` using `this.server.tool(...)`. 
+
+## Connect to Cloudflare AI Playground
+
+You can connect to your MCP server from the Cloudflare AI Playground, which is a remote MCP client:
+
+1. Go to https://playground.ai.cloudflare.com/
+2. Enter your deployed MCP server URL (`remote-mcp-server-authless.<your-account>.workers.dev/sse`)
+3. You can now use your MCP tools directly from the playground!
+
+## Connect Claude Desktop to your MCP server
+
+You can also connect to your remote MCP server from local MCP clients, by using the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote). 
+
+To connect to your MCP server from Claude Desktop, follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user) and within Claude Desktop go to Settings > Developer > Edit Config.
+
+Update with this configuration:
 
 ```json
 {
   "mcpServers": {
-    "abacate-pay": {
-      "command": "node",
-      "args": ["/caminho/completo/para/abacatepay-mcp/dist/index.js"],
-      "env": {
-        "ABACATE_PAY_API_KEY": "sua_api_key_aqui"
-      }
+    "calculator": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8787/sse"  // or remote-mcp-server-authless.your-account.workers.dev/sse
+      ]
     }
   }
 }
 ```
 
-### 3. Configure no Cursor
-
-Adicione ao seu `settings.json` do Cursor:
-
-```json
-{
-  "mcp.servers": {
-    "abacate-pay": {
-      "command": "node",
-      "args": ["/caminho/completo/para/abacatepay-mcp/dist/index.js"],
-      "env": {
-        "ABACATE_PAY_API_KEY": "sua_api_key_aqui"
-      }
-    }
-  }
-}
-```
-
-**⚠️ Importante**: Substitua `/caminho/completo/para/abacatepay-mcp/` pelo caminho real onde você clonou o repositório.
-
-## 🔑 Como obter sua API Key
-
-1. Acesse [Abacate Pay](https://www.abacatepay.com)
-2. Vá em **Integrar** → **API Keys**
-3. Copie sua API Key e coloque na configuração acima
-
-## 📝 Exemplos de Uso
-
-### 🎯 Campanha com Influencer
-```
-"Eu contratei um influencer chamado Alex para divulgar meu negócio. Você pode criar um cupom com 15% de desconto usando o código ALEX15 que vale para até 100 usos? Preciso acompanhar o desempenho da campanha."
-```
-
-### 🔍 Investigação de Cobranças
-```
-"Tive uma cobrança estranha ontem que não reconheço. Você pode buscar todas as cobranças de ontem e me mostrar os detalhes para eu verificar o que pode ter acontecido?"
-```
-
-### 💼 Novo Cliente Corporativo  
-```
-"Acabei de fechar um contrato com a empresa TechSolutions LTDA (CNPJ: 12.345.678/0001-90). Pode criar o cadastro deles com o email contato@techsolutions.com e telefone (11) 3456-7890? Depois preciso gerar um QR Code PIX de R$ 10 para o pagamento."
-```
-
-## 🐛 Problemas Comuns
-
-### Erro de API Key
-```
-❌ Chave de API não fornecida
-```
-**Solução**: Verifique se sua API Key está correta no arquivo de configuração.
-
-### MCP Server não conecta
-**Solução**: 
-1. Verifique se o caminho para o arquivo está correto
-2. Reinicie o Claude Desktop/Cursor após adicionar a configuração
-3. Certifique-se de que executou `npm run build`
-
-### Erro de permissão
-**Solução**: Certifique-se de que o arquivo `dist/index.js` tenha permissões de execução:
-```bash
-chmod +x dist/index.js
-```
-
-## 🤝 Contribuição
-
-Quer contribuir? Veja o [Guia de Contribuição](CONTRIBUTING.md).
-
-## 📄 Licença
-
-MIT - veja [LICENSE](LICENSE) para detalhes.
-
----
-
-
-
+Restart Claude and you should see the tools become available. 

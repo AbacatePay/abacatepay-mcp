@@ -1,79 +1,25 @@
 {
-  "name": "abacatepay-mcp",
-  "version": "1.0.6",
-  "description": "🥑 Servidor MCP (Model Context Protocol) para integração com a API do Abacate Pay - Gerencie clientes, cobranças, PIX e cupons através de assistentes de IA",
-  "main": "dist/index.js",
-  "type": "module",
-  "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:node:* && echo '#!/usr/bin/env node\nimport \"./index.js\";' > dist/bin.js && chmod 755 dist/bin.js",
-    "build:tsc": "tsc && chmod 755 dist/index.js",
-    "dev": "tsc -w",
-    "start": "node dist/index.js",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build",
-    "inspector": "node scripts/inspector.js",
-    "lint": "eslint src/ scripts/ --ext .ts,.js",
-    "lint:fix": "eslint src/ scripts/ --ext .ts,.js --fix",
-    "security": "npm audit && npm run lint",
-    "precommit": "npm run security && npm run build",
-    "changeset": "changeset",
-    "changeset:version": "changeset version",
-    "changeset:publish": "changeset publish",
-    "changeset:status": "changeset status"
-  },
-  "files": [
-    "dist/index.js",
-    "dist/bin.js",
-    "README.md",
-    "LICENSE"
-  ],
-  "bin": {
-    "abacatepay-mcp": "./dist/bin.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/AbacatePay/abacatepay-mcp.git"
-  },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "abacate-pay",
-    "payment",
-    "pix",
-    "api",
-    "claude",
-    "ai",
-    "assistant",
-    "billing",
-    "coupon",
-    "brazil"
-  ],
-  "author": "Vinícius Américo",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/AbacatePay/abacatepay-mcp/issues"
-  },
-  "homepage": "https://github.com/AbacatePay/abacatepay-mcp#readme",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "minimist": "^1.2.8",
-    "zod": "^3.25.30"
-  },
-  "devDependencies": {
-    "@changesets/cli": "^2.29.4",
-    "@eslint/js": "^9.27.0",
-    "@types/inquirer": "^9.0.8",
-    "@types/minimist": "^1.2.5",
-    "@types/node": "^22.15.21",
-    "@typescript-eslint/eslint-plugin": "^8.33.0",
-    "@typescript-eslint/parser": "^8.33.0",
-    "esbuild": "^0.24.2",
-    "eslint": "^9.27.0",
-    "eslint-plugin-security": "^3.0.1",
-    "inquirer": "^12.6.3",
-    "typescript": "^5.8.3"
-  },
-  "engines": {
-    "node": ">=18.19.1"
-  }
+	"name": "remote-mcp-server-authless",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"format": "biome format --write",
+		"lint:fix": "biome lint --fix",
+		"start": "wrangler dev",
+		"cf-typegen": "wrangler types",
+		"type-check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "1.17.1",
+		"agents": "^0.0.109",
+		"zod": "^3.25.67"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.1.3",
+		"@types/node": "^24.3.0",
+		"typescript": "5.8.3",
+		"wrangler": "^4.32.0"
+	}
 }
