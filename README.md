@@ -1,50 +1,197 @@
-# Building a Remote MCP Server on Cloudflare (Without Auth)
+# 🥑 Abacate Pay MCP Server
 
-This example allows you to deploy a remote MCP server that doesn't require authentication on Cloudflare Workers. 
+Um servidor MCP (Model Context Protocol) para integração com a API do Abacate Pay rodando no Cloudflare Workers, permitindo gerenciar pagamentos, clientes e cobranças diretamente através de assistentes de IA como Claude e Cursor.
 
-## Get started: 
+## ✨ Multi-Tenancy
 
-[![Deploy to Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/ai/tree/main/demos/remote-mcp-authless)
+**🔐 Multi-tenancy ativo!** O servidor suporta múltiplos clientes simultaneamente. Cada requisição pode incluir sua própria chave de API, permitindo que diferentes usuários/organizações usem o mesmo servidor MCP com suas respectivas contas do Abacate Pay.
 
-This will deploy your MCP server to a URL like: `remote-mcp-server-authless.<your-account>.workers.dev/sse`
+## 🚀 Deploy Rápido
 
-Alternatively, you can use the command line below to get the remote MCP Server created on your local machine:
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/AbacatePay/abacatepay-mcp)
+
+Ou clone e faça deploy manual:
 ```bash
-npm create cloudflare@latest -- my-mcp-server --template=cloudflare/ai/demos/remote-mcp-authless
+git clone https://github.com/AbacatePay/abacatepay-mcp.git
+cd abacatepay-mcp
+npm install
+npx wrangler deploy
 ```
 
-## Customizing your MCP Server
+## 🎯 O que você pode fazer
 
-To add your own [tools](https://developers.cloudflare.com/agents/model-context-protocol/tools/) to the MCP server, define each tool inside the `init()` method of `src/index.ts` using `this.server.tool(...)`. 
+- 👥 **Gerenciar clientes**: Criar e listar clientes
+- 💰 **Criar cobranças**: Links de pagamento e faturas  
+- 📱 **QR Codes PIX**: Pagamentos instantâneos
+- 🎫 **Cupons de desconto**: Promoções e descontos
+- 🔄 **Simular pagamentos**: Testar fluxos em desenvolvimento
 
-## Connect to Cloudflare AI Playground
+## 🔑 Como obter sua API Key
 
-You can connect to your MCP server from the Cloudflare AI Playground, which is a remote MCP client:
+1. Acesse [Abacate Pay](https://www.abacatepay.com)
+2. Vá em **Integrar** → **API Keys**
+3. Copie sua API Key (formato: `abc_dev_...` ou `abc_live_...`)
 
-1. Go to https://playground.ai.cloudflare.com/
-2. Enter your deployed MCP server URL (`remote-mcp-server-authless.<your-account>.workers.dev/sse`)
-3. You can now use your MCP tools directly from the playground!
+## ⚙️ Configuração no Cursor/Claude
 
-## Connect Claude Desktop to your MCP server
+### Opção 1: Multi-Tenant (Recomendado)
 
-You can also connect to your remote MCP server from local MCP clients, by using the [mcp-remote proxy](https://www.npmjs.com/package/mcp-remote). 
-
-To connect to your MCP server from Claude Desktop, follow [Anthropic's Quickstart](https://modelcontextprotocol.io/quickstart/user) and within Claude Desktop go to Settings > Developer > Edit Config.
-
-Update with this configuration:
+Cada usuário configura sua própria chave:
 
 ```json
 {
   "mcpServers": {
-    "calculator": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://localhost:8787/sse"  // or remote-mcp-server-authless.your-account.workers.dev/sse
-      ]
+    "abacate-pay": {
+      "type": "http",
+      "url": "https://abacatepay-mcp.SEU_USUARIO.workers.dev/mcp?key=SUA_CHAVE_AQUI",
+      "sseUrl": "https://abacatepay-mcp.SEU_USUARIO.workers.dev/sse?key=SUA_CHAVE_AQUI"
     }
   }
 }
 ```
 
-Restart Claude and you should see the tools become available. 
+### Opção 2: Desenvolvimento Local
+
+```json
+{
+  "mcpServers": {
+    "abacate-pay": {
+      "type": "http",
+      "url": "http://localhost:8787/mcp?key=SUA_CHAVE_AQUI",
+      "sseUrl": "http://localhost:8787/sse?key=SUA_CHAVE_AQUI"
+    }
+  }
+}
+```
+
+**⚠️ Importante**: 
+- Substitua `SEU_USUARIO` pelo seu username do Cloudflare
+- Substitua `SUA_CHAVE_AQUI` pela sua API key do Abacate Pay
+- O servidor aceita chaves via query string `?key=` ou header `x-abacatepay-key`
+
+## 🏗️ Desenvolvimento Local
+
+```bash
+# Clone o repositório
+git clone https://github.com/AbacatePay/abacatepay-mcp.git
+cd abacatepay-mcp
+
+# Instale dependências
+npm install
+
+# Execute localmente
+npm start
+
+# Teste endpoints
+curl "http://localhost:8787/sse?key=SUA_CHAVE"
+curl "http://localhost:8787/mcp?key=SUA_CHAVE"
+```
+
+## 📝 Exemplos de Uso
+
+### 🎯 Campanha com Influencer
+```
+"Eu contratei um influencer chamado Alex para divulgar meu negócio. Você pode criar um cupom com 15% de desconto usando o código ALEX15 que vale para até 100 usos? Preciso acompanhar o desempenho da campanha."
+```
+
+### 🔍 Investigação de Cobranças
+```
+"Tive uma cobrança estranha ontem que não reconheço. Você pode buscar todas as cobranças de ontem e me mostrar os detalhes para eu verificar o que pode ter acontecido?"
+```
+
+### 💼 Novo Cliente Corporativo  
+```
+"Acabei de fechar um contrato com a empresa TechSolutions LTDA (CNPJ: 12.345.678/0001-90). Pode criar o cadastro deles com o email contato@techsolutions.com e telefone (11) 3456-7890? Depois preciso gerar um QR Code PIX de R$ 10 para o pagamento."
+```
+
+## 🔐 Segurança e Multi-Tenancy
+
+### ✅ Recursos de Segurança
+
+- **🛡️ Rate Limiting**: 100 requisições por minuto por IP+chave
+- **🔒 Error Sanitization**: Erros não vazam informações sensíveis
+- **🌐 CORS**: Suporte adequado para browsers
+- **👥 Isolamento**: Cada chave acessa apenas seus próprios dados
+- **⚡ Workers**: Execução distribuída e escalável
+
+### 🔑 Como Funciona
+
+**Multi-Tenant**: Cada tool aceita parâmetro `apiKey` opcional
+```json
+{
+  "name": "createCustomer",
+  "arguments": {
+    "apiKey": "abc_dev_sua_chave_aqui",
+    "name": "João Silva",
+    "email": "joao@exemplo.com",
+    "cellphone": "(11) 99999-9999",
+    "taxId": "123.456.789-01"
+  }
+}
+```
+
+**Prioridade de Chaves**:
+1. Header `x-abacatepay-key`
+2. Query string `?key=`
+3. Parâmetro `apiKey` na tool
+
+## 🌐 Integração com Automação
+
+### HTTP API para n8n/Zapier
+
+```javascript
+// Exemplo para criar cliente via HTTP
+const response = await fetch('https://SEU_WORKER.workers.dev/mcp', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-abacatepay-key': 'SUA_CHAVE_AQUI'
+  },
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: {
+      name: 'createCustomer',
+      arguments: {
+        name: 'João Silva',
+        email: 'joao@exemplo.com',
+        cellphone: '(11) 99999-9999',
+        taxId: '123.456.789-01'
+      }
+    }
+  })
+});
+```
+
+## 🐛 Problemas Comuns
+
+### ❌ Erro 401 - Chave inválida
+```
+❌ Chave de API inválida. Verifique suas credenciais.
+```
+**Solução**: Verifique se a chave está correta e é válida no Abacate Pay.
+
+### ❌ Erro 429 - Rate limit
+```
+❌ Rate limit exceeded
+```
+**Solução**: Aguarde 1 minuto antes de fazer novas requisições.
+
+### ❌ MCP não conecta
+**Solução**: 
+1. Verifique se a URL está correta
+2. Teste com curl primeiro
+3. Reinicie o Claude/Cursor após configurar
+
+## 🤝 Contribuição
+
+Quer contribuir? Abra issues e PRs no [GitHub](https://github.com/AbacatePay/abacatepay-mcp)!
+
+## 📄 Licença
+
+MIT - veja [LICENSE](LICENSE) para detalhes.
+
+---
+
+**🥑 Feito com ❤️ pela equipe [Abacate Pay](https://www.abacatepay.com)** 
