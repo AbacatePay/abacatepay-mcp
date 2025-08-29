@@ -15,22 +15,21 @@ jobs:
     - name: 📥 Checkout do código
       uses: actions/checkout@v4
 
-    - name: 🟢 Setup Node.js
-      uses: actions/setup-node@v4
+    - name: 🟢 Setup Bun
+      uses: oven-sh/setup-bun@v1
       with:
-        node-version: '18'
-        cache: 'npm'
+        bun-version: latest
 
     - name: 📦 Instalar dependências
-      run: npm ci
+      run: bun install
 
     - name: 🔍 Auditoria de segurança
       run: |
         echo "🔍 Verificando vulnerabilidades de segurança..."
-        npm audit --audit-level=high
+        bun audit
         if [ $? -ne 0 ]; then
           echo "❌ Vulnerabilidades de alta severidade encontradas!"
-          echo "💡 Execute 'npm audit fix' para corrigir automaticamente"
+          echo "💡 Execute 'bun audit' para verificar detalhes"
           exit 1
         fi
         echo "✅ Nenhuma vulnerabilidade crítica encontrada"
@@ -38,10 +37,10 @@ jobs:
     - name: 🧹 Verificação de código (ESLint)
       run: |
         echo "🧹 Verificando qualidade do código..."
-        npm run lint
+        bun run lint
         if [ $? -ne 0 ]; then
           echo "❌ Problemas de qualidade de código encontrados!"
-          echo "💡 Execute 'npm run lint:fix' para corrigir automaticamente"
+          echo "💡 Execute 'bun run lint:fix' para corrigir automaticamente"
           exit 1
         fi
         echo "✅ Código está seguindo os padrões de qualidade"
@@ -49,23 +48,13 @@ jobs:
     - name: 🔧 Verificação de tipos TypeScript
       run: |
         echo "🔧 Verificando tipos TypeScript..."
-        npx tsc --noEmit
+        bunx tsc --noEmit
         if [ $? -ne 0 ]; then
           echo "❌ Erros de tipo encontrados!"
           echo "💡 Corrija os erros de TypeScript antes de continuar"
           exit 1
         fi
         echo "✅ Todos os tipos estão corretos"
-
-    - name: 🏗️ Compilação do projeto
-      run: |
-        echo "🏗️ Compilando o projeto..."
-        npm run build
-        if [ $? -ne 0 ]; then
-          echo "❌ Falha na compilação!"
-          exit 1
-        fi
-        echo "✅ Projeto compilado com sucesso"
 
     - name: 🧪 Verificação do script inspector
       run: |
@@ -76,7 +65,7 @@ jobs:
         fi
         
         # Verifica sintaxe do script
-        node -c scripts/inspector.js
+        bun scripts/inspector.js --help
         if [ $? -ne 0 ]; then
           echo "❌ Script inspector tem erros de sintaxe!"
           exit 1
@@ -88,16 +77,16 @@ jobs:
       run: |
         echo "🔍 Verificando arquivos essenciais..."
         
-        # Verifica se os arquivos compilados existem
-        if [ ! -f "dist/index.js" ]; then
-          echo "❌ Arquivo principal compilado não encontrado!"
+        # Verifica se os arquivos TypeScript principais existem
+        if [ ! -f "src/index.ts" ]; then
+          echo "❌ Arquivo principal não encontrado!"
           exit 1
         fi
         
         # Verifica se o package.json tem os scripts necessários
-        if ! grep -q '"build"' package.json || ! grep -q '"start"' package.json || ! grep -q '"inspector"' package.json; then
-          echo "❌ Scripts npm essenciais não encontrados!"
-          echo "📋 Scripts necessários: build, start, inspector"
+        if ! grep -q '"start"' package.json || ! grep -q '"inspector"' package.json; then
+          echo "❌ Scripts bun essenciais não encontrados!"
+          echo "📋 Scripts necessários: start, inspector"
           exit 1
         fi
         
@@ -105,16 +94,13 @@ jobs:
 
     - name: 🎯 Teste de importação do MCP Server
       run: |
-        echo "🎯 Testando se o MCP Server pode ser importado..."
-        node -e "
-          import('./dist/index.js').then(() => {
-            console.log('✅ MCP Server importado com sucesso');
-            process.exit(0);
-          }).catch(err => {
-            console.error('❌ Falha ao importar MCP Server:', err.message);
-            process.exit(1);
-          });
-        "
+        echo "🎯 Testando se o MCP Server pode ser executado..."
+        bun run src/index.ts --help
+        if [ $? -ne 0 ]; then
+          echo "❌ Falha ao executar MCP Server!"
+          exit 1
+        fi
+        echo "✅ MCP Server executado com sucesso"
 
     - name: 🎉 Sucesso
       run: |
@@ -126,9 +112,8 @@ jobs:
         echo "  ✅ Segurança verificada"
         echo "  ✅ Qualidade de código aprovada"
         echo "  ✅ Tipos TypeScript corretos"
-        echo "  ✅ Compilação bem-sucedida"
         echo "  ✅ Script inspector funcional"
         echo "  ✅ Arquivos essenciais presentes"
-        echo "  ✅ MCP Server importável"
+        echo "  ✅ MCP Server executável"
         echo ""
         echo "🚀 Pronto para merge! 🥑" 
