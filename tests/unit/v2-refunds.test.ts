@@ -37,6 +37,8 @@ describe("v2RefundPaymentLink", () => {
     const calls = stubFetch({ data: { refundPublicId: "tran_pl" } });
     const out = await tools.get("v2RefundPaymentLink")!.handler({ apiKey: KEY, id: "bill_pl" }, {});
     expect(calls[0].url).toBe("https://api.abacatepay.com/v2/payment-links/refund");
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ id: "bill_pl" });
     expect(out.content[0].text).toContain("tran_pl");
   });
 });
@@ -48,6 +50,8 @@ describe("v2RefundTransparentPix", () => {
     const calls = stubFetch({ data: { refundPublicId: "tran_tp" } });
     const out = await tools.get("v2RefundTransparentPix")!.handler({ apiKey: KEY, id: "pix_char_1" }, {});
     expect(calls[0].url).toBe("https://api.abacatepay.com/v2/transparents/refund");
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ id: "pix_char_1" });
     expect(out.content[0].text).toContain("tran_tp");
   });
 });
