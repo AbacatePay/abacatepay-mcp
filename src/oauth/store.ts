@@ -11,6 +11,7 @@ import { decrypt, encrypt, loadEncryptionKey } from "./crypto.js";
 const DB_PATH = resolve(process.env.OAUTH_DB_PATH ?? "./oauth.db");
 
 const dbDir = dirname(DB_PATH);
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- dbDir derived from OAUTH_DB_PATH operator config, not user input
 if (!existsSync(dbDir)) mkdirSync(dbDir, { recursive: true });
 
 const encKey = loadEncryptionKey(DB_PATH);

@@ -32,7 +32,9 @@ export function loadEncryptionKey(dbPath: string): Buffer {
 
   const keyPath = dbPath.replace(/\.db$/i, "") + ".key";
 
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- keyPath derived from OAUTH_DB_PATH/OAUTH_ENCRYPTION_KEY operator config, not user input
   if (existsSync(keyPath)) {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- see above
     const raw = readFileSync(keyPath, "utf8").trim();
     const key = Buffer.from(raw, "hex");
     if (key.length !== 32) {
@@ -43,7 +45,9 @@ export function loadEncryptionKey(dbPath: string): Buffer {
 
   const key = randomBytes(32);
   const dir = dirname(keyPath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir derived from OAUTH_DB_PATH/OAUTH_ENCRYPTION_KEY operator config, not user input
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- see above
   writeFileSync(keyPath, key.toString("hex"), { mode: 0o600 });
 
   console.error(`🔑 OAuth encryption key auto-generated → ${keyPath}`);
