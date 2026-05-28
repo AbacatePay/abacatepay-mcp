@@ -9,6 +9,7 @@ import { registerV2ProductTools } from "./products.js";
 import { registerV2StoreTools } from "./store.js";
 import { registerV2SubscriptionTools } from "./subscriptions.js";
 import { registerV2TransparentTools } from "./transparents.js";
+import { registerV2WebhookTools } from "./webhooks.js";
 
 /** Registra ferramentas que chamam apenas https://api.abacatepay.com/v2 (chave API v2). */
 export function registerV2Tools(server: McpServer) {
@@ -22,4 +23,5 @@ export function registerV2Tools(server: McpServer) {
   registerV2PixSendTools(server);
   registerV2SubscriptionTools(server);
   registerV2StoreTools(server);
+  registerV2WebhookTools(server);
 }
