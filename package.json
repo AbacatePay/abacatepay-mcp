@@ -11,7 +11,7 @@
     "dev:http": "bun --watch src/http-server.ts",
     "inspector": "bun run scripts/inspector.js",
     "test": "bun test tests/unit",
-    "test:smoke": "ABACATE_PAY_SMOKE=1 bun test tests/smoke",
+    "test:smoke": "ABACATE_PAY_SMOKE=1 bun test ./tests/smoke/v2-read.smoke.ts",
     "lint": "eslint src/ scripts/ --ext .ts,.js",
     "lint:fix": "eslint src/ scripts/ --ext .ts,.js --fix",
     "security": "bun audit && bun run lint",
