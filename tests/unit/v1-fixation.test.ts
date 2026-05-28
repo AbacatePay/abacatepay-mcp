@@ -13,6 +13,10 @@ describe("v1 createCustomer (fixação)", () => {
     expect(tools.has("createCustomer")).toBe(true);
     expect(tools.has("listCustomers")).toBe(true);
 
+    const schema = tools.get("createCustomer")!.schema;
+    expect((schema.apiKey as any)._def.description).not.toContain("v2");
+    expect((schema.apiKey as any)._def.typeName).toBe("ZodOptional");
+
     const calls = stubFetch({ data: { id: "cust_1" } });
     const out = await tools.get("createCustomer")!.handler(
       { apiKey: KEY, name: "Ana", cellphone: "(11) 4002-8922", email: "a@b.com", taxId: "123" },
