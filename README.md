@@ -109,7 +109,7 @@ Troque `API_KEY` pela sua chave ([Integrar](https://www.abacatepay.com) → **AP
 
 ## Ferramentas (resumo)
 
-- **v2:** clientes, cupons, produtos, checkouts, links de pagamento, Pix transparente, payouts, envio Pix, assinaturas, loja e métricas públicas. Implementação: `src/tools/v2/`.
+- **v2:** clientes, cupons, produtos, checkouts (criar/listar/obter/reembolsar), links de pagamento (criar/listar/obter/reembolsar), Pix transparente (criar/checar/simular/listar/reembolsar), payouts, envio Pix, assinaturas (checkout/listar/cancelar/trocar plano/registrar uso), webhooks (criar/listar/obter/deletar), loja e métricas públicas. Implementação: `src/tools/v2/`.
 - **v1:** clientes (`/customer/*`), cobranças (`/billing/*`), QR Pix (`/pixQrCode/*`), cupons (`/coupon/*`), saques (`/withdraw/*`). Implementação: `src/tools/*.ts` (exceto `v2/`).
 
 Nomes exatos das tools são os registrados no código; a lista completa aparece no cliente MCP ao conectar.
