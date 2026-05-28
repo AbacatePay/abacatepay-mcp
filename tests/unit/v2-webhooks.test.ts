@@ -52,8 +52,10 @@ describe("v2GetWebhook", () => {
   test("GET /webhooks/get?id=", async () => {
     const tools = collectTools(registerV2WebhookTools);
     const calls = stubFetch({ data: { id: "webh_1" } });
-    await tools.get("v2GetWebhook")!.handler({ apiKey: KEY, id: "webh_1" }, {});
+    const out = await tools.get("v2GetWebhook")!.handler({ apiKey: KEY, id: "webh_1" }, {});
     expect(calls[0].url).toBe("https://api.abacatepay.com/v2/webhooks/get?id=webh_1");
+    expect(calls[0].init.method).toBe("GET");
+    expect(out.content[0].text).toContain("webh_1");
   });
 });
 
