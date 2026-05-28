@@ -25,10 +25,11 @@ describe("v2ChangeSubscriptionPlan", () => {
     const tools = collectTools(registerV2SubscriptionTools);
     expect(tools.has("v2ChangeSubscriptionPlan")).toBe(true);
     const calls = stubFetch({ data: { id: "subs_1", productId: "prod_pro" } });
-    await tools.get("v2ChangeSubscriptionPlan")!.handler(
+    const out = await tools.get("v2ChangeSubscriptionPlan")!.handler(
       { apiKey: KEY, id: "subs_1", productId: "prod_pro", quantity: 2 },
       {}
     );
+    expect(out.content[0].text).toContain("prod_pro");
     expect(calls[0].url).toBe("https://api.abacatepay.com/v2/subscriptions/change-plan");
     expect(calls[0].init.method).toBe("POST");
     expect(JSON.parse(String(calls[0].init.body))).toEqual({ id: "subs_1", productId: "prod_pro", quantity: 2 });
@@ -40,7 +41,7 @@ describe("v2RecordSubscriptionUsage", () => {
     const tools = collectTools(registerV2SubscriptionTools);
     expect(tools.has("v2RecordSubscriptionUsage")).toBe(true);
     const calls = stubFetch({ data: { id: "usage_1" } });
-    await tools.get("v2RecordSubscriptionUsage")!.handler(
+    const out = await tools.get("v2RecordSubscriptionUsage")!.handler(
       { apiKey: KEY, id: "subs_1", productId: "prod_api", units: 50, action: "add" },
       {}
     );
@@ -52,5 +53,16 @@ describe("v2RecordSubscriptionUsage", () => {
       units: 50,
       action: "add",
     });
+    expect(out.content[0].text).toContain("usage_1");
+  });
+
+  test("action subtract é passado no body", async () => {
+    const tools = collectTools(registerV2SubscriptionTools);
+    const calls = stubFetch({ data: { id: "usage_2" } });
+    await tools.get("v2RecordSubscriptionUsage")!.handler(
+      { apiKey: KEY, id: "subs_1", productId: "prod_api", units: 5, action: "subtract" },
+      {}
+    );
+    expect(JSON.parse(String(calls[0].init.body))).toMatchObject({ action: "subtract" });
   });
 });
