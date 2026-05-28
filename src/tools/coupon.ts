@@ -1,18 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam } from "./shared.js";
 
 export function registerCouponTools(server: McpServer) {
   server.tool(
     "createCoupon",
     "Cria um novo cupom de desconto (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       code: z.string().describe("Código único do cupom (ex: DESCONTO20)"),
       discountKind: z
         .enum(["PERCENTAGE", "FIXED"])
@@ -87,12 +83,7 @@ export function registerCouponTools(server: McpServer) {
     "listCoupons",
     "Lista todos os cupons de desconto criados no Abacate Pay (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
     },
     async (params, extra) => {
       const { apiKey } = params as any;

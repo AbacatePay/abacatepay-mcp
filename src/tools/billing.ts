@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam } from "./shared.js";
 
 const customerPayload = z
   .object({
@@ -26,12 +27,7 @@ export function registerBillingTools(server: McpServer) {
     "createBilling",
     "Cria uma nova cobrança no Abacate Pay (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       frequency: z
         .enum(["ONE_TIME", "MULTIPLE_PAYMENTS"])
         .default("ONE_TIME")
@@ -131,12 +127,7 @@ export function registerBillingTools(server: McpServer) {
     "listBillings",
     "Lista todas as cobranças criadas no Abacate Pay (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
     },
     async (params, extra) => {
       const { apiKey } = params as any;
