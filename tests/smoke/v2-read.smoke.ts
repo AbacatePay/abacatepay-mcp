@@ -12,5 +12,6 @@ describe.skipIf(!ENABLED)("smoke v2 (read-only, chave real)", () => {
     const out = await tools.get("v2ListCustomers")!.handler({ apiKey: KEY, limit: 1 }, {});
     expect(out.content[0].text).not.toContain("HTTP 401");
     expect(out.content[0].text).not.toContain("API key é obrigatória");
+    expect(out.content[0].text).toMatch(/Nenhum cliente\.|^\d+\./);
   });
 });
