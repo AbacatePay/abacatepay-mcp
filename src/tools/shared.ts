@@ -7,6 +7,7 @@ const API_KEY_DESC_V1 =
 const API_KEY_DESC_V2 =
   "Override opcional (chave v2). Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use uma chave v2 em ABACATE_PAY_API_KEY.";
 
+/** Schema zod opcional do parâmetro `apiKey`, com a descrição correta por versão. */
 export function apiKeyParam(version: ApiVersion) {
   const desc = version === "v2" ? API_KEY_DESC_V2 : API_KEY_DESC_V1;
   return z.string().optional().describe(desc);

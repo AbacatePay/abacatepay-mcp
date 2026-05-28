@@ -1,6 +1,6 @@
 export type ToolHandler = (
   params: Record<string, unknown>,
-  extra: { sessionId?: string }
+  extra: { sessionId?: string; signal?: AbortSignal; authInfo?: unknown }
 ) => Promise<{ content: Array<{ type: "text"; text: string }> }>;
 
 export type CollectedTool = {
@@ -9,6 +9,7 @@ export type CollectedTool = {
   handler: ToolHandler;
 };
 
+/** Roda uma função registerXxxTools contra um McpServer falso e devolve um Map nome→tool. */
 export function collectTools(
   register: (server: { tool: (...args: any[]) => void }) => void
 ): Map<string, CollectedTool> {

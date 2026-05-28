@@ -2,6 +2,7 @@ export type FetchCall = { url: string; init: RequestInit };
 
 let originalFetch: typeof globalThis.fetch | undefined;
 
+/** Substitui globalThis.fetch por um stub que responde body/status e registra as chamadas. */
 export function stubFetch(body: unknown, status = 200): FetchCall[] {
   const calls: FetchCall[] = [];
   if (originalFetch === undefined) originalFetch = globalThis.fetch;
@@ -17,5 +18,8 @@ export function stubFetch(body: unknown, status = 200): FetchCall[] {
 }
 
 export function restoreFetch(): void {
-  if (originalFetch) globalThis.fetch = originalFetch;
+  if (originalFetch) {
+    globalThis.fetch = originalFetch;
+    originalFetch = undefined;
+  }
 }
