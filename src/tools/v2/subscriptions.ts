@@ -96,4 +96,87 @@ export function registerV2SubscriptionTools(server: McpServer) {
       }
     }
   );
+
+  server.tool(
+    "v2CancelSubscription",
+    "Cancela imediatamente uma assinatura ativa (API v2 — chave v2). Irreversível.",
+    {
+      apiKey: v2ApiKey,
+      id: z.string().describe("ID da assinatura (subs_...)."),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          version: "v2",
+          path: "/subscriptions/cancel",
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: JSON.stringify({ id: p.id }),
+        });
+        const d = res.data;
+        return {
+          content: [{ type: "text", text: `Assinatura cancelada: ${d?.id} — ${d?.status}` }],
+        };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "v2ChangeSubscriptionPlan",
+    "Agenda alteração do produto principal de uma assinatura para o próximo ciclo (API v2 — chave v2). Produto deve ter ciclo de cobrança.",
+    {
+      apiKey: v2ApiKey,
+      id: z.string().describe("ID da assinatura (subs_...)."),
+      productId: z.string().describe("ID do novo produto (com ciclo)."),
+      quantity: z.number().int().min(1).describe("Quantidade do novo produto."),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          version: "v2",
+          path: "/subscriptions/change-plan",
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: JSON.stringify({ id: p.id, productId: p.productId, quantity: p.quantity }),
+        });
+        return { content: [{ type: "text", text: `Plano alterado (agendado):\n${JSON.stringify(res.data, null, 2)}` }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "v2RecordSubscriptionUsage",
+    "Registra uso (pay-as-you-go) numa assinatura ativa (API v2 — chave v2). Produto NÃO deve ter ciclo de cobrança.",
+    {
+      apiKey: v2ApiKey,
+      id: z.string().describe("ID da assinatura (subs_...)."),
+      productId: z.string().describe("ID do produto de uso (sem ciclo)."),
+      units: z.number().int().min(1).describe("Unidades a registrar."),
+      action: z.enum(["add", "subtract"]).describe("add: acrescenta; subtract: estorna."),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          version: "v2",
+          path: "/subscriptions/record-usage",
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: JSON.stringify({ id: p.id, productId: p.productId, units: p.units, action: p.action }),
+        });
+        return { content: [{ type: "text", text: `Uso registrado:\n${JSON.stringify(res.data, null, 2)}` }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
 }
