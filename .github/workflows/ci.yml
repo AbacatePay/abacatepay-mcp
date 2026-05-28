@@ -59,7 +59,7 @@ jobs:
     - name: 🧪 Testes unitários
       run: |
         echo "🧪 Rodando testes unitários..."
-        bun test tests/unit
+        env -u ABACATE_PAY_API_KEY bun test tests/unit
         if [ $? -ne 0 ]; then
           echo "❌ Testes falharam!"
           exit 1
