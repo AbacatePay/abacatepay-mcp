@@ -1,18 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam } from "./shared.js";
 
 export function registerPixTools(server: McpServer) {
   server.tool(
     "createPixQrCode",
     "Cria um QR Code PIX para pagamento direto (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       amount: z.number().describe("Valor da cobrança em centavos"),
       expiresIn: z.number().optional().describe("Tempo de expiração em segundos (opcional)"),
       description: z
@@ -99,12 +95,7 @@ export function registerPixTools(server: McpServer) {
     "simulatePixPayment",
     "Simula o pagamento de um QR Code PIX (apenas em modo desenvolvimento; API v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       id: z.string().describe("ID do QR Code PIX para simular o pagamento"),
       metadata: z.record(z.unknown()).optional().describe("Metadados opcionais para a requisição"),
     },
@@ -175,12 +166,7 @@ export function registerPixTools(server: McpServer) {
     "checkPixStatus",
     "Verifica o status de um QR Code PIX (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       id: z.string().describe("ID do QR Code PIX para verificar o status"),
     },
     async (params, extra) => {

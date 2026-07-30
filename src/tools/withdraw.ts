@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam } from "./shared.js";
 
 const pixKeySchema = z
   .object({
@@ -14,12 +15,7 @@ export function registerWithdrawTools(server: McpServer) {
     "createWithdraw",
     "Cria um saque para transferir valores da conta para uma chave PIX (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       description: z.string().optional().describe("Descrição opcional do saque"),
       externalId: z.string().describe("ID externo único do saque no seu sistema"),
       method: z.literal("PIX").describe("Método de saque (apenas PIX na API v1)"),
@@ -89,12 +85,7 @@ export function registerWithdrawTools(server: McpServer) {
     "listWithdraw",
     "Lista todos os saques criados (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
     },
     async (params, extra) => {
       const { apiKey } = params as any;
@@ -143,12 +134,7 @@ export function registerWithdrawTools(server: McpServer) {
     "getWithdraw",
     "Busca um saque pelo externalId (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       externalId: z.string().describe("Identificador externo do saque no seu sistema"),
     },
     async (params, extra) => {

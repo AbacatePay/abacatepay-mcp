@@ -20,8 +20,10 @@ export default [
         fetch: 'readonly',
         RequestInit: 'readonly',
         HeadersInit: 'readonly',
+        URL: 'readonly',
         URLSearchParams: 'readonly',
-        Response: 'readonly'
+        Response: 'readonly',
+        AbortSignal: 'readonly'
       }
     },
     plugins: {

@@ -127,4 +127,34 @@ export function registerV2CheckoutTools(server: McpServer) {
       }
     }
   );
+
+  server.tool(
+    "v2RefundCheckout",
+    "Reembolsa integralmente um checkout pago (API v2 — chave v2). Reembolso parcial não é suportado.",
+    {
+      apiKey: v2ApiKey,
+      id: z.string().describe("ID público do recurso (char_/pix_char_/card_/bill_)."),
+      reason: z.string().max(500).optional().describe("Motivo do reembolso."),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const body: Record<string, unknown> = { id: p.id };
+        if (p.reason) body.reason = p.reason;
+        const res = await makeAbacatePayRequest<any>({
+          version: "v2",
+          path: "/checkouts/refund",
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        return {
+          content: [{ type: "text", text: `Checkout reembolsado\nrefund: ${res.data?.refundPublicId}` }],
+        };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
 }

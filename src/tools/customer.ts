@@ -1,18 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam } from "./shared.js";
 
 export function registerCustomerTools(server: McpServer) {
   server.tool(
     "createCustomer",
     "Cria um novo cliente no Abacate Pay (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
       name: z.string().describe("Nome completo do cliente"),
       cellphone: z.string().describe("Celular do cliente (ex: (11) 4002-8922)"),
       email: z.string().email().describe("E-mail do cliente"),
@@ -60,12 +56,7 @@ export function registerCustomerTools(server: McpServer) {
     "listCustomers",
     "Lista todos os clientes cadastrados no Abacate Pay (API v1 — requer chave v1).",
     {
-      apiKey: z
-        .string()
-        .optional()
-        .describe(
-          "Override opcional. Em HTTP multi-tenant prefira Authorization ou X-API-Key; em stdio use ABACATE_PAY_API_KEY."
-        ),
+      apiKey: apiKeyParam("v1"),
     },
     async (params, extra) => {
       const { apiKey } = params as any;
