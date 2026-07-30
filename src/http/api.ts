@@ -1,15 +1,5 @@
-import {
-  ABACATE_PAY_API_BASE_V1,
-  ABACATE_PAY_API_BASE_V2,
-  USER_AGENT,
-} from "../config.js";
+import { ABACATE_PAY_API_BASE, USER_AGENT } from "../config.js";
 import { resolveApiKey } from "../utils/api-key.js";
-
-export type ApiVersion = "v1" | "v2";
-
-function getBaseUrl(version: ApiVersion): string {
-  return version === "v1" ? ABACATE_PAY_API_BASE_V1 : ABACATE_PAY_API_BASE_V2;
-}
 
 function normalizePath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
@@ -25,17 +15,10 @@ function buildErrorMessage(status: number, bodyText: string): string {
   } catch {
     // use raw body
   }
-  let message = `HTTP ${status}: ${detail}`;
-  if (/version mismatch|incompat/i.test(message)) {
-    message +=
-      "\n\nDica: chaves da API v1 só funcionam com ferramentas legadas (sem prefixo v2). " +
-      "Chaves v2 só funcionam com ferramentas cujo nome começa com v2.";
-  }
-  return message;
+  return `HTTP ${status}: ${detail}`;
 }
 
 export type MakeAbacatePayRequestOptions = {
-  version: ApiVersion;
   path: string;
   apiKey?: string;
   /** MCP streamable session id (HTTP); stdio typically omits. */
@@ -48,14 +31,13 @@ export async function makeAbacatePayRequest<T = unknown>(
   options: MakeAbacatePayRequestOptions
 ): Promise<T> {
   const {
-    version,
     path,
     apiKey: apiKeyOverride,
     sessionId,
     headers: userHeaders,
     ...fetchInit
   } = options;
-  const url = `${getBaseUrl(version)}${normalizePath(path)}`;
+  const url = `${ABACATE_PAY_API_BASE}${normalizePath(path)}`;
   const authKey = resolveApiKey(sessionId, apiKeyOverride);
   if (!authKey) {
     throw new Error(

@@ -27,12 +27,19 @@ export function validateApiKeyMiddleware(
   const finalKey = fromRequest?.trim() || globalApiKey?.trim() || "";
 
   if (!finalKey) {
-    res.setHeader("WWW-Authenticate", 'Bearer realm="abacatepay-mcp"');
+    const proto = (req.headers["x-forwarded-proto"] as string | undefined) ?? req.protocol;
+    const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
+    const resourceMetadataUrl = `${proto}://${host}/.well-known/oauth-protected-resource`;
+
+    res.setHeader(
+      "WWW-Authenticate",
+      `Bearer realm="abacatepay-mcp", resource_metadata="${resourceMetadataUrl}"`,
+    );
     res.status(401).json({
       jsonrpc: "2.0",
       error: {
         code: -32001,
-        message: "Unauthorized: API key required. Connect via OAuth or pass Authorization: Bearer <key>.",
+        message: "Unauthorized: connect via OAuth or pass Authorization: Bearer <key>.",
       },
       id: null,
     });

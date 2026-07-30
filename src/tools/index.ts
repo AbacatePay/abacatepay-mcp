@@ -1,21 +1,27 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { registerBillingTools } from "./billing.js";
-import { registerCouponTools } from "./coupon.js";
-import { registerCustomerTools } from "./customer.js";
-import { registerPixTools } from "./pix.js";
-import { registerWithdrawTools } from "./withdraw.js";
-import { registerV2Tools } from "./v2/index.js";
+import { registerCheckoutTools } from "./checkouts.js";
+import { registerCouponTools } from "./coupons.js";
+import { registerCustomerTools } from "./customers.js";
+import { registerPaymentLinkTools } from "./payment-links.js";
+import { registerPayoutTools } from "./payouts.js";
+import { registerPixSendTools } from "./pix-send.js";
+import { registerProductTools } from "./products.js";
+import { registerStoreTools } from "./store.js";
+import { registerSubscriptionTools } from "./subscriptions.js";
+import { registerTransparentTools } from "./transparents.js";
+import { registerWebhookTools } from "./webhooks.js";
 
-/** Ferramentas legadas: apenas API v1 (/v1). */
-export function registerV1Tools(server: McpServer) {
-  registerCustomerTools(server);
-  registerBillingTools(server);
-  registerPixTools(server);
-  registerCouponTools(server);
-  registerWithdrawTools(server);
-}
-
+/** Registers all MCP tools (Abacate Pay API v2). */
 export function registerAllTools(server: McpServer) {
-  registerV1Tools(server);
-  registerV2Tools(server);
+  registerCustomerTools(server);
+  registerCouponTools(server);
+  registerProductTools(server);
+  registerCheckoutTools(server);
+  registerPaymentLinkTools(server);
+  registerTransparentTools(server);
+  registerPayoutTools(server);
+  registerPixSendTools(server);
+  registerSubscriptionTools(server);
+  registerStoreTools(server);
+  registerWebhookTools(server);
 }

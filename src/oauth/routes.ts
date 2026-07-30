@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import express from "express";
-import type { Request, RequestHandler, Response } from "express";
-import { ABACATE_PAY_API_BASE_V1, USER_AGENT } from "../config.js";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+import { ABACATE_PAY_API_BASE, USER_AGENT } from "../config.js";
 import {
   consumeAuthCode,
   createAuthCode,
@@ -22,7 +22,65 @@ type BodyRequest = Request & { body?: unknown };
 export const oauthRouter = express.Router();
 
 // ---------------------------------------------------------------------------
-// OAuth 2.0 Authorization Server Metadata (RFC 8414)
+// CORS — all OAuth endpoints must be reachable from browser contexts
+// ---------------------------------------------------------------------------
+oauthRouter.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiting — sliding window, per IP
+// Applied to POST /authorize because it calls the AbacatePay API on every
+// submission, making it a key-validation oracle if left open.
+// ---------------------------------------------------------------------------
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const rateLimitStore = new Map<string, number[]>();
+
+function getClientIp(req: Request): string {
+  const xff = req.headers["x-forwarded-for"];
+  if (typeof xff === "string" && xff) return xff.split(",")[0].trim();
+  const flyIp = req.headers["fly-client-ip"];
+  if (typeof flyIp === "string" && flyIp) return flyIp;
+  return "unknown";
+}
+
+function isRateLimited(req: Request): boolean {
+  const ip = getClientIp(req);
+  const now = Date.now();
+  const recent = (rateLimitStore.get(ip) ?? []).filter(t => t > now - RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
+    rateLimitStore.set(ip, recent);
+    return true;
+  }
+  rateLimitStore.set(ip, [...recent, now]);
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// RFC 9728 — OAuth 2.0 Protected Resource Metadata
+// ---------------------------------------------------------------------------
+oauthRouter.get("/.well-known/oauth-protected-resource", (req: Request, res: Response) => {
+  const base = serverBase(req);
+  res.json({
+    resource: `${base}/mcp`,
+    authorization_servers: [base],
+    bearer_methods_supported: ["header"],
+    resource_documentation: "https://github.com/AbacatePay/abacatepay-mcp",
+    scopes_supported: ["mcp"],
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RFC 8414 — OAuth 2.0 Authorization Server Metadata
 // ---------------------------------------------------------------------------
 oauthRouter.get("/.well-known/oauth-authorization-server", (req: Request, res: Response) => {
   const base = serverBase(req);
@@ -35,6 +93,8 @@ oauthRouter.get("/.well-known/oauth-authorization-server", (req: Request, res: R
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
+    scopes_supported: ["mcp"],
+    revocation_endpoint: `${base}/revoke`,
   });
 });
 
@@ -46,7 +106,10 @@ oauthRouter.post("/register", jsonParser, (req: Request, res: Response) => {
   const { redirect_uris, client_name } = body;
 
   if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
-    res.status(400).json({ error: "invalid_client_metadata", error_description: "redirect_uris is required" });
+    res.status(400).json({
+      error: "invalid_client_metadata",
+      error_description: "redirect_uris is required",
+    });
     return;
   }
 
@@ -68,7 +131,11 @@ oauthRouter.post("/register", jsonParser, (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 oauthRouter.get("/authorize", (req: Request, res: Response) => {
   const q = req.query as Record<string, string | undefined>;
-  const { client_id, redirect_uri, code_challenge, code_challenge_method, state, response_type } = q;
+  const {
+    client_id, redirect_uri, code_challenge,
+    code_challenge_method, state, response_type,
+    scope, resource,
+  } = q;
 
   const paramError = validateAuthorizeParams({ client_id, redirect_uri, code_challenge, code_challenge_method, response_type });
   if (paramError) {
@@ -76,11 +143,14 @@ oauthRouter.get("/authorize", (req: Request, res: Response) => {
     return;
   }
 
+  setFormSecurityHeaders(res);
   res.send(authorizePage({
     clientId: client_id!,
     redirectUri: redirect_uri!,
     codeChallenge: code_challenge!,
     state,
+    scope,
+    resource,
   }));
 });
 
@@ -88,36 +158,51 @@ oauthRouter.get("/authorize", (req: Request, res: Response) => {
 // Authorization endpoint — POST (process API key submission)
 // ---------------------------------------------------------------------------
 oauthRouter.post("/authorize", urlencodedParser, async (req: Request, res: Response) => {
+  if (isRateLimited(req)) {
+    res.status(429).json({
+      error: "too_many_requests",
+      error_description: "Too many authorization attempts. Try again in 15 minutes.",
+    });
+    return;
+  }
+
   const body = ((req as BodyRequest).body ?? {}) as Record<string, string | undefined>;
-  const { client_id, redirect_uri, code_challenge, state, api_key } = body;
+  const { client_id, redirect_uri, code_challenge, state, api_key, scope, resource } = body;
 
   if (!client_id || !redirect_uri || !code_challenge || !api_key) {
+    setFormSecurityHeaders(res);
     res.status(400).send(errorPage("Missing required fields."));
     return;
   }
 
   const client = getClient(client_id);
   if (!client || !client.redirectUris.includes(redirect_uri)) {
+    setFormSecurityHeaders(res);
     res.status(400).send(errorPage("Invalid client or redirect URI."));
     return;
   }
 
   const valid = await validateAbacatePayKey(api_key);
   if (!valid) {
+    setFormSecurityHeaders(res);
     res.send(authorizePage({
       clientId: client_id,
       redirectUri: redirect_uri,
       codeChallenge: code_challenge,
       state,
+      scope,
+      resource,
       error: "API key inválida. Verifique sua chave no painel do Abacate Pay.",
     }));
     return;
   }
 
-  const code = createAuthCode(client_id, redirect_uri, code_challenge, api_key);
+  const code = createAuthCode(client_id, redirect_uri, code_challenge, api_key, scope, resource);
 
+  const base = serverBase(req);
   const redirectUrl = new URL(redirect_uri);
   redirectUrl.searchParams.set("code", code);
+  redirectUrl.searchParams.set("iss", base);   // RFC 9207 — issuer identification
   if (state) redirectUrl.searchParams.set("state", state);
 
   res.redirect(redirectUrl.toString());
@@ -128,7 +213,7 @@ oauthRouter.post("/authorize", urlencodedParser, async (req: Request, res: Respo
 // ---------------------------------------------------------------------------
 oauthRouter.post("/token", urlencodedParser, jsonParser, (req: Request, res: Response) => {
   const body = ((req as BodyRequest).body ?? {}) as Record<string, string | undefined>;
-  const { grant_type, code, redirect_uri, code_verifier, client_id } = body;
+  const { grant_type, code, redirect_uri, code_verifier, client_id, resource } = body;
 
   if (grant_type !== "authorization_code") {
     res.status(400).json({ error: "unsupported_grant_type" });
@@ -136,53 +221,88 @@ oauthRouter.post("/token", urlencodedParser, jsonParser, (req: Request, res: Res
   }
 
   if (!code || !redirect_uri || !code_verifier || !client_id) {
-    res.status(400).json({ error: "invalid_request", error_description: "Missing required parameters" });
+    res.status(400).json({
+      error: "invalid_request",
+      error_description: "Missing required parameters",
+    });
     return;
   }
 
   const entry = consumeAuthCode(code);
   if (!entry) {
-    res.status(400).json({ error: "invalid_grant", error_description: "Authorization code is invalid or expired" });
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "Authorization code is invalid or expired",
+    });
     return;
   }
 
   if (entry.clientId !== client_id || entry.redirectUri !== redirect_uri) {
-    res.status(400).json({ error: "invalid_grant", error_description: "client_id or redirect_uri mismatch" });
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "client_id or redirect_uri mismatch",
+    });
+    return;
+  }
+
+  // RFC 8707: resource sent in token request must match what was authorized
+  if (entry.resource && resource && entry.resource !== resource) {
+    res.status(400).json({
+      error: "invalid_target",
+      error_description: "resource parameter does not match the authorized resource",
+    });
     return;
   }
 
   if (!verifyPkce(code_verifier, entry.codeChallenge)) {
-    res.status(400).json({ error: "invalid_grant", error_description: "PKCE verification failed" });
+    res.status(400).json({
+      error: "invalid_grant",
+      error_description: "PKCE verification failed",
+    });
     return;
   }
 
-  res.json({
+  const tokenResponse: Record<string, string> = {
     access_token: entry.apiKey,
     token_type: "bearer",
-    scope: "mcp",
-  });
+  };
+  if (entry.scope) tokenResponse.scope = entry.scope;
+
+  res.json(tokenResponse);
+});
+
+// ---------------------------------------------------------------------------
+// Token revocation stub (RFC 7009)
+// API keys don't expire server-side; this satisfies clients that POST /revoke
+// after disconnecting.
+// ---------------------------------------------------------------------------
+oauthRouter.post("/revoke", urlencodedParser, jsonParser, (_req: Request, res: Response) => {
+  res.status(200).end();
 });
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function serverBase(req: Request): string {
+export function serverBase(req: Request): string {
   const proto = (req.headers["x-forwarded-proto"] as string | undefined) ?? req.protocol;
   const host = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host;
   return `${proto}://${host}`;
 }
 
+function setFormSecurityHeaders(res: Response): void {
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+}
+
 function verifyPkce(verifier: string, challenge: string): boolean {
-  const computed = createHash("sha256")
-    .update(verifier)
-    .digest("base64url");
+  const computed = createHash("sha256").update(verifier).digest("base64url");
   return computed === challenge;
 }
 
 async function validateAbacatePayKey(apiKey: string): Promise<boolean> {
   try {
-    const resp = await fetch(`${ABACATE_PAY_API_BASE_V1}/billing/list`, {
+    const resp = await fetch(`${ABACATE_PAY_API_BASE}/stores/get`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -201,6 +321,8 @@ interface AuthorizePageOptions {
   redirectUri: string;
   codeChallenge: string;
   state?: string;
+  scope?: string;
+  resource?: string;
   error?: string;
 }
 
@@ -215,10 +337,8 @@ function validateAuthorizeParams(params: Record<string, string | undefined>): st
 }
 
 function authorizePage(opts: AuthorizePageOptions): string {
-  const { clientId, redirectUri, codeChallenge, state, error } = opts;
-  const errorHtml = error
-    ? `<p class="error">${esc(error)}</p>`
-    : "";
+  const { clientId, redirectUri, codeChallenge, state, scope, resource, error } = opts;
+  const errorHtml = error ? `<p class="error">${esc(error)}</p>` : "";
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -295,10 +415,12 @@ function authorizePage(opts: AuthorizePageOptions): string {
     <p class="subtitle">Insira sua chave de API para autorizar o acesso ao seu assistente de IA.</p>
     ${errorHtml}
     <form method="POST" action="/authorize" autocomplete="off">
-      <input type="hidden" name="client_id" value="${esc(clientId)}" />
-      <input type="hidden" name="redirect_uri" value="${esc(redirectUri)}" />
+      <input type="hidden" name="client_id"      value="${esc(clientId)}" />
+      <input type="hidden" name="redirect_uri"   value="${esc(redirectUri)}" />
       <input type="hidden" name="code_challenge" value="${esc(codeChallenge)}" />
-      <input type="hidden" name="state" value="${esc(state ?? "")}" />
+      <input type="hidden" name="state"          value="${esc(state ?? "")}" />
+      <input type="hidden" name="scope"          value="${esc(scope ?? "")}" />
+      <input type="hidden" name="resource"       value="${esc(resource ?? "")}" />
       <label for="api_key">Chave de API</label>
       <input type="password" id="api_key" name="api_key" placeholder="abacatepay_..." required autofocus />
       <button type="submit">Autorizar</button>

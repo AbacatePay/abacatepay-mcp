@@ -1,16 +1,24 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
-export function registerV2PayoutTools(server: McpServer) {
+const pixDest = z
+  .object({
+    type: z.enum(["CPF", "CNPJ", "PHONE", "EMAIL", "RANDOM", "BR_CODE"]),
+    key: z.string(),
+  })
+  .strict();
+
+export function registerPayoutTools(server: McpServer) {
   server.tool(
-    "v2CreatePayout",
-    "Cria payout para transferir da conta AbacatePay (API v2; não envia chave PIX no body).",
+    "createPayout",
+    "Transfere saldo da conta Abacate Pay para uma chave PIX da própria loja (a chave de destino deve pertencer ao mesmo CPF/CNPJ da loja).",
     {
-      apiKey: v2ApiKey,
-      amount: z.number().min(350),
-      externalId: z.string(),
+      apiKey: apiKeyParam(),
+      amount: z.number().min(1).describe("Valor em centavos."),
+      pix: pixDest.describe("Chave PIX de destino (deve ser da própria loja)."),
+      externalId: z.string().optional(),
       description: z.string().optional(),
     },
     async (params, extra) => {
@@ -18,12 +26,12 @@ export function registerV2PayoutTools(server: McpServer) {
       try {
         const body: Record<string, unknown> = {
           amount: p.amount,
-          externalId: p.externalId,
+          pix: p.pix,
         };
+        if (p.externalId) body.externalId = p.externalId;
         if (p.description) body.description = p.description;
 
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/payouts/create",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -35,7 +43,7 @@ export function registerV2PayoutTools(server: McpServer) {
           content: [
             {
               type: "text",
-              text: `Payout ${d.id} — ${d.status} — ${d.amount} centavos — ext ${d.externalId}`,
+              text: `Payout ${d.id} — ${d.status} — ${d.amount} centavos — ext ${d.externalId ?? "—"}`,
             },
           ],
         };
@@ -46,18 +54,18 @@ export function registerV2PayoutTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetPayout",
-    "Busca payout por externalId (API v2).",
+    "getPayout",
+    "Busca payout por id ou externalId.",
     {
-      apiKey: v2ApiKey,
-      externalId: z.string(),
+      apiKey: apiKeyParam(),
+      id: z.string().optional(),
+      externalId: z.string().optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/payouts/get${buildQuery({ externalId: p.externalId })}`,
+          path: `/payouts/get${buildQuery({ id: p.id, externalId: p.externalId })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
@@ -70,36 +78,31 @@ export function registerV2PayoutTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListPayouts",
-    "Lista payouts (API v2).",
+    "listPayouts",
+    "Lista payouts.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
-      externalId: z.string().optional(),
-      status: z.enum(["PENDING", "EXPIRED", "CANCELLED", "COMPLETE", "REFUNDED"]).optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/payouts/list${buildQuery({
             after: p.after,
             before: p.before,
             limit: p.limit,
             id: p.id,
-            externalId: p.externalId,
-            status: p.status,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
         });
         const rows =
-          res.data?.map((t: any, i: number) => `${i + 1}. ${t.id} — ${t.status} — ${t.externalId}`).join("\n") ||
+          res.data?.map((t: any, i: number) => `${i + 1}. ${t.id} — ${t.status} — ${t.externalId ?? "—"}`).join("\n") ||
           "Nenhum payout.";
         return { content: [{ type: "text", text: `${rows}${paginationHint(res.pagination)}` }] };
       } catch (e) {

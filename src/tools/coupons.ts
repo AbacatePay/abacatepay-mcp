@@ -1,19 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
-export function registerV2CouponTools(server: McpServer) {
+const couponStatus = z.enum(["ACTIVE", "DELETED", "DISABLED"]);
+
+export function registerCouponTools(server: McpServer) {
   server.tool(
-    "v2CreateCoupon",
-    "Cria cupom (API v2 — chave v2).",
+    "createCoupon",
+    "Cria cupom de desconto.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       code: z.string(),
       discountKind: z.enum(["PERCENTAGE", "FIXED"]),
       discount: z.number(),
       notes: z.string().optional(),
-      maxRedeems: z.number().optional(),
+      maxRedeems: z.number().optional().describe("-1 para ilimitado. Padrão: -1 se omitido."),
       metadata: z.record(z.unknown()).optional(),
     },
     async (params, extra) => {
@@ -23,13 +25,13 @@ export function registerV2CouponTools(server: McpServer) {
           code: p.code,
           discountKind: p.discountKind,
           discount: p.discount,
+          // The API requires maxRedeems in the body; -1 (unlimited) is a sane default when omitted.
+          maxRedeems: p.maxRedeems ?? -1,
         };
         if (p.notes != null) body.notes = p.notes;
-        if (p.maxRedeems != null) body.maxRedeems = p.maxRedeems;
         if (p.metadata) body.metadata = p.metadata;
 
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/coupons/create",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -47,21 +49,20 @@ export function registerV2CouponTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListCoupons",
-    "Lista cupons (API v2).",
+    "listCoupons",
+    "Lista cupons.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
-      status: z.enum(["ACTIVE", "INACTIVE", "EXPIRED"]).optional(),
+      status: couponStatus.optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/coupons/list${buildQuery({
             after: p.after,
             before: p.before,
@@ -84,18 +85,18 @@ export function registerV2CouponTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetCoupon",
-    "Busca cupom (API v2).",
+    "getCoupon",
+    "Busca cupom por id.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string().optional(),
+      status: couponStatus.optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/coupons/get${buildQuery({ id: p.id })}`,
+          path: `/coupons/get${buildQuery({ id: p.id, status: p.status })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
@@ -108,17 +109,16 @@ export function registerV2CouponTools(server: McpServer) {
   );
 
   server.tool(
-    "v2DeleteCoupon",
-    "Remove cupom (API v2).",
+    "deleteCoupon",
+    "Remove cupom.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/coupons/delete${buildQuery({ id: p.id })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -133,22 +133,21 @@ export function registerV2CouponTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ToggleCoupon",
-    "Alterna cupom ativo/inativo (API v2).",
+    "toggleCoupon",
+    "Alterna cupom entre ativo (ACTIVE) e desativado (DISABLED).",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/coupons/toggle${buildQuery({ id: p.id })}`,
+          path: "/coupons/toggle",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "POST",
-          body: "{}",
+          body: JSON.stringify({ id: p.id }),
         });
         return { content: [{ type: "text", text: `Status: ${res.data?.status}` }] };
       } catch (e) {

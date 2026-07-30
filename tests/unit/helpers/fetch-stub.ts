@@ -2,7 +2,7 @@ export type FetchCall = { url: string; init: RequestInit };
 
 let originalFetch: typeof globalThis.fetch | undefined;
 
-/** Substitui globalThis.fetch por um stub que responde body/status e registra as chamadas. */
+/** Replaces globalThis.fetch with a stub that responds with body/status and records calls. */
 export function stubFetch(body: unknown, status = 200): FetchCall[] {
   const calls: FetchCall[] = [];
   if (originalFetch === undefined) originalFetch = globalThis.fetch;

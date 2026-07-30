@@ -1,25 +1,32 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
-export function registerV2ProductTools(server: McpServer) {
+const cycleEnum = z.enum(["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUALLY", "ANNUALLY"]);
+
+export function registerProductTools(server: McpServer) {
   server.tool(
-    "v2CreateProduct",
-    "Cria produto para usar em checkouts (API v2).",
+    "createProduct",
+    "Cria produto para usar em checkouts, links de pagamento ou assinaturas.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       externalId: z.string(),
       name: z.string(),
-      price: z.number(),
+      price: z.number().int().min(1).describe("Preço em centavos."),
       currency: z.enum(["BRL"]).default("BRL"),
       description: z.string().optional(),
-      imageUrl: z.union([z.string().url(), z.null()]).optional(),
-      cycle: z
-        .enum(["WEEKLY", "MONTHLY", "SEMIANNUALLY", "ANNUALLY"])
-        .nullable()
+      image: z.string().url().optional().describe("URL de imagem remota; será baixada e re-hospedada (máx. 5MB)."),
+      imageUrl: z.string().url().optional(),
+      fileUrl: z
+        .string()
+        .url()
         .optional()
-        .describe("Null ou omitido = produto avulso"),
+        .describe("URL de arquivo remoto (PDF, máx. 20MB); vira download após a compra."),
+      cycle: cycleEnum
+        .optional()
+        .describe("Omitido = produto avulso (não recorrente); presente = elegível para assinaturas."),
+      trialDays: z.number().int().min(1).max(90).optional(),
     },
     async (params, extra) => {
       const p = params as any;
@@ -31,11 +38,13 @@ export function registerV2ProductTools(server: McpServer) {
           currency: p.currency ?? "BRL",
         };
         if (p.description != null) body.description = p.description;
-        if (p.imageUrl !== undefined) body.imageUrl = p.imageUrl;
-        if (p.cycle !== undefined) body.cycle = p.cycle;
+        if (p.image) body.image = p.image;
+        if (p.imageUrl) body.imageUrl = p.imageUrl;
+        if (p.fileUrl) body.fileUrl = p.fileUrl;
+        if (p.cycle) body.cycle = p.cycle;
+        if (p.trialDays != null) body.trialDays = p.trialDays;
 
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/products/create",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -53,29 +62,34 @@ export function registerV2ProductTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListProducts",
-    "Lista produtos (API v2).",
+    "listProducts",
+    "Lista produtos.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
       externalId: z.string().optional(),
-      status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+      keyword: z.string().optional(),
+      name: z.string().optional(),
+      status: z.string().optional(),
+      currency: z.string().optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/products/list${buildQuery({
             after: p.after,
             before: p.before,
             limit: p.limit,
             id: p.id,
             externalId: p.externalId,
+            keyword: p.keyword,
+            name: p.name,
             status: p.status,
+            currency: p.currency,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -92,19 +106,19 @@ export function registerV2ProductTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetProduct",
-    "Busca produto por id ou externalId (API v2).",
+    "getProduct",
+    "Busca produto por id, name ou externalId.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string().optional(),
+      name: z.string().optional(),
       externalId: z.string().optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/products/get${buildQuery({ id: p.id, externalId: p.externalId })}`,
+          path: `/products/get${buildQuery({ id: p.id, name: p.name, externalId: p.externalId })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
@@ -117,17 +131,16 @@ export function registerV2ProductTools(server: McpServer) {
   );
 
   server.tool(
-    "v2DeleteProduct",
-    "Remove produto (API v2).",
+    "deleteProduct",
+    "Remove produto.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/products/delete${buildQuery({ id: p.id })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

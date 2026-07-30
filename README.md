@@ -1,8 +1,8 @@
 # Abacate Pay MCP Server
 
-Servidor [MCP](https://modelcontextprotocol.io) para usar a [API Abacate Pay](https://www.abacatepay.com) no **Cursor**, no **Claude Desktop** ou por **URL** (integrações). Inclui ferramentas **v1** e **v2** no mesmo processo.
+Servidor [MCP](https://modelcontextprotocol.io) para usar a [API v2 da Abacate Pay](https://docs.abacatepay.com/pages/reference/introduction) no **Claude**, no **Cursor** ou por **URL remota** (Claude.ai, automações, outras integrações).
 
-**Conteúdo:** [Início rápido](#início-rápido) · [API v1 e v2](#api-v1-e-v2) · [Como rodar o servidor](#como-rodar-o-servidor) · [Ferramentas](#ferramentas-resumo) · [Problemas comuns](#problemas-comuns)
+**Conteúdo:** [Início rápido](#início-rápido) · [Como rodar o servidor](#como-rodar-o-servidor) · [Conectar via OAuth (Claude.ai / remoto)](#conectar-via-oauth-claudeai--remoto) · [Ferramentas](#ferramentas) · [Problemas comuns](#problemas-comuns)
 
 ---
 
@@ -16,9 +16,9 @@ cd abacatepay-mcp
 bun install
 ```
 
-**Chave de API:** [Abacate Pay](https://www.abacatepay.com) → **Integrar** → **API Keys**.
+**Chave de API:** [Abacate Pay](https://www.abacatepay.com) → **Integrar** → **API Keys**. Use uma chave de **API v2** — é a única versão suportada por este servidor.
 
-**Claude Desktop**
+**Claude Desktop / Cursor** (modo local, processo próprio):
 
 ```json
 {
@@ -34,61 +34,32 @@ bun install
 }
 ```
 
-**Cursor**
-
-```json
-{
-  "mcp.servers": {
-    "abacate-pay": {
-      "command": "bun",
-      "args": ["/CAMINHO/absoluto/para/abacatepay-mcp/src/index.ts"],
-      "env": {
-        "ABACATE_PAY_API_KEY": "sua_chave"
-      }
-    }
-  }
-}
-```
-
-- A chave em `ABACATE_PAY_API_KEY` deve ser **v1 ou v2** de acordo com o que você usa ([tabela abaixo](#api-v1-e-v2)). Muitas ferramentas também aceitam `apiKey` na própria chamada, para usar outra chave quando precisar.
-
----
-
-## API v1 e v2
-
-| | URL base | Ferramentas MCP | Chave |
-|--|----------|-----------------|--------|
-| **v2** | `https://api.abacatepay.com/v2` | Prefixo **`v2`** (`v2CreateCheckout`, `v2ListCustomers`, `v2CreateProduct`, …) | Chave criada para **v2** |
-| **v1** | `https://api.abacatepay.com/v1` | Nomes **sem** prefixo `v2` (`createCustomer`, `createBilling`, `listBillings`, `createPixQrCode`, `createCoupon`, `createWithdraw`, `listWithdraw`, `getWithdraw`, …) | Chave criada para **v1** |
-
-Chaves **não** são intercambiáveis: uso errado tende a responder com *version mismatch*. O servidor tenta acrescentar uma dica nesses erros.
-
-**Especificação (fonte de verdade para campos e rotas):**
-
-- v1: [openapi-v1.yaml](https://github.com/AbacatePay/documentation/blob/main/openapi-v1.yaml)
-- v2: [openapi.yaml](https://github.com/AbacatePay/documentation/blob/main/openapi.yaml)
+Muitas ferramentas também aceitam `apiKey` na própria chamada, para usar outra chave quando precisar (útil para operar em modo teste e produção sem trocar a configuração).
 
 ---
 
 ## Como rodar o servidor
 
-Escolha **uma** opção. Para Cursor ou Claude no dia a dia, a primeira é quase sempre a certa.
+Escolha **uma** opção.
 
-### No seu computador com Cursor ou Claude (o mais simples)
+### No seu computador com Cursor ou Claude Desktop (o mais simples)
 
-O próprio app **liga** o servidor para você. Você só configura o caminho do `src/index.ts` e a variável `ABACATE_PAY_API_KEY` (como no [início rápido](#início-rápido)).
+O próprio app **liga** o servidor para você via stdio (`bun run src/index.ts`). Você só configura o caminho e a variável `ABACATE_PAY_API_KEY`, como no [início rápido](#início-rápido). Não precisa de URL, porta ou OAuth.
 
-**Em resumo:** colou a config, pôs a chave, ajustou o caminho, pronto. Não precisa configurar URL, porta ou “modo HTTP”.
+### Na internet (HTTP) — Claude.ai, n8n, automações
 
-### Na internet (HTTP) — MCP remoto, automações e outras ferramentas
-
-Use o endpoint público quando você integra com n8n, outras automações ou quer **configuração remota** no cliente (sem `command` / processo local).
+Use o endpoint público quando você integra com Claude.ai (conector remoto), n8n, outras automações, ou quer configuração remota no cliente (sem `command`/processo local).
 
 | Onde roda | Endereço |
 |-----------|----------|
 | Servidor público Abacate Pay | `https://mcp.abacatepay.com/mcp` |
 
-**Cursor e Claude Code:** também dá para usar o MCP apontando para essa URL e enviando a chave nos headers (multi-tenant ou sem variável `ABACATE_PAY_API_KEY` no seu disco). Exemplo para o Cursor:
+Esse endpoint aceita dois modos de autenticação:
+
+1. **`Authorization: Bearer <chave-v2>`** (ou header `X-API-Key`) diretamente — simples para clientes que já guardam a chave (n8n, scripts, Cursor apontando para a URL).
+2. **OAuth 2.0** — obrigatório para o **conector remoto do Claude.ai**, que não aceita headers estáticos e exige um fluxo de autorização. Veja a seção abaixo.
+
+Exemplo de configuração remota (Cursor, com header direto):
 
 ```json
 {
@@ -103,26 +74,74 @@ Use o endpoint público quando você integra com n8n, outras automações ou que
 }
 ```
 
-Troque `API_KEY` pela sua chave ([Integrar](https://www.abacatepay.com) → **API Keys**) — **v1** ou **v2**, alinhada às ferramentas que você usa. O servidor HTTP também aceita `X-API-Key` em vez de `Authorization`, se o seu cliente preferir. No Claude Code, o formato é o mesmo conceito (URL + headers); confira o arquivo de configuração do produto para o nome exato da chave no JSON.
+### Local, servindo HTTP (para testar OAuth ou o modo multi-tenant)
+
+```bash
+bun run src/http-server.ts
+# porta padrão 3000; ajuste com MCP_PORT ou PORT
+```
 
 ---
 
-## Ferramentas (resumo)
+## Conectar via OAuth (Claude.ai / remoto)
 
-- **v2:** clientes, cupons, produtos, checkouts (criar/listar/obter/reembolsar), links de pagamento (criar/listar/obter/reembolsar), Pix transparente (criar/checar/simular/listar/reembolsar), payouts, envio Pix, assinaturas (checkout/listar/cancelar/trocar plano/registrar uso), webhooks (criar/listar/obter/deletar), loja e métricas públicas. Implementação: `src/tools/v2/`.
-- **v1:** clientes (`/customer/*`), cobranças (`/billing/*`), QR Pix (`/pixQrCode/*`), cupons (`/coupon/*`), saques (`/withdraw/*`). Implementação: `src/tools/*.ts` (exceto `v2/`).
+O servidor implementa um Authorization Server OAuth 2.0 completo (Dynamic Client Registration + Authorization Code + PKCE), necessário porque **o conector remoto do Claude.ai exige OAuth** — não é possível conectar apenas com um header estático nesse cliente.
 
-Nomes exatos das tools são os registrados no código; a lista completa aparece no cliente MCP ao conectar.
+Fluxo, do ponto de vista do Claude/cliente MCP:
+
+1. O cliente descobre os metadados em `/.well-known/oauth-protected-resource` e `/.well-known/oauth-authorization-server`.
+2. Registra-se dinamicamente em `POST /register` (RFC 7591).
+3. Abre `GET /authorize` no navegador do usuário — uma página simples pede a **chave de API v2** da Abacate Pay (não uma senha de conta).
+4. Após validar a chave contra a API (`GET /v2/stores/get`), o servidor emite um código de autorização e redireciona de volta ao cliente.
+5. O cliente troca o código por um token em `POST /token` (com verificação PKCE). O "token" retornado é, na prática, a própria chave de API v2, guardada de forma criptografada (AES-256-GCM) no SQLite do servidor até esse ponto.
+6. O cliente usa esse token como `Authorization: Bearer` normalmente em `/mcp`.
+
+Não há conta de usuário nem senha do Abacate Pay envolvida — apenas a chave de API do lojista, o mesmo modelo de autenticação usado no header direto.
+
+**Configuração de produção (Fly.io):** o banco de dados OAuth (SQLite) precisa de um volume persistente e de uma chave de criptografia fixa:
+
+```bash
+fly volumes create oauth_data --size 1 --region gru
+fly secrets set OAUTH_ENCRYPTION_KEY=$(openssl rand -hex 32)
+```
+
+Isso já está configurado em `fly.toml` (`OAUTH_DB_PATH=/data/oauth.db`, montado no volume `oauth_data`). Localmente, se `OAUTH_ENCRYPTION_KEY` não estiver definida, uma chave é gerada e persistida ao lado do banco (`oauth.key`), com aviso no console.
 
 ---
+
+## Ferramentas
+
+Nomes exatos das tools são os registrados no código (`src/tools/`); a lista completa aparece no cliente MCP ao conectar. Resumo por recurso:
+
+| Recurso | Tools |
+|---|---|
+| Clientes | `createCustomer`, `listCustomers`, `getCustomer`, `deleteCustomer` |
+| Cupons | `createCoupon`, `listCoupons`, `getCoupon`, `deleteCoupon`, `toggleCoupon` |
+| Produtos | `createProduct`, `listProducts`, `getProduct`, `deleteProduct` |
+| Checkouts (pagamento único) | `createCheckout`, `listCheckouts`, `getCheckout`, `deleteCheckout`, `refundCheckout` |
+| Links de pagamento (reutilizáveis) | `createPaymentLink`, `listPaymentLinks`, `getPaymentLink`, `deletePaymentLink`, `refundPaymentLink` |
+| Checkout transparente (PIX/Boleto) | `createTransparentPix`, `createTransparentBoleto`, `getTransparent`, `checkTransparentPix`, `simulateTransparentPixPayment`, `listTransparent`, `refundTransparent` |
+| Payouts (saque para a própria chave Pix) | `createPayout`, `getPayout`, `listPayouts` |
+| Envio de Pix (para terceiros) | `sendPix`, `getPixTransaction`, `listPixTransactions` |
+| Assinaturas | `createSubscription`, `listSubscriptions`, `getSubscription`, `cancelSubscription`, `changeSubscriptionPlan`, `recordSubscriptionUsage` |
+| Loja | `getStore`, `listStores` |
+| Webhooks | `createWebhook`, `listWebhooks`, `getWebhook`, `deleteWebhook` |
+
+Implementação: um arquivo por recurso em `src/tools/` (ex.: `src/tools/checkouts.ts`).
+
+**Notas importantes de negócio, refletidas nas ferramentas:**
+- Reembolsos (`refund*`) são sempre integrais — a API v2 não suporta reembolso parcial.
+- `checkTransparentPix` e `simulateTransparentPixPayment` funcionam apenas para PIX; boleto não tem simulação de pagamento.
+- `simulateTransparentPixPayment` só funciona com uma chave de **teste** (modo dev).
+- `listPixTransactions`/`getPixTransaction` exigem `id`; a API não pagina nem filtra por status nesse endpoint.
+- `changeSubscriptionPlan` e `cancelSubscription` são irreversíveis; não há suporte a pró-rata no cancelamento.
 
 ## Ideias de prompts
 
+- Produto + checkout: *"Crie um produto 'Consultoria' de R$ 150 e um checkout PIX+cartão para ele."*
 - Cupom para campanha: *"Crie um cupom 15% com código ALEX15, máximo 100 usos."*
-- Conferir cobranças: *"Liste as cobranças recentes e resuma status e valores."*
-- Cliente + Pix (v1): *"Cadastre o cliente X e gere um Pix de R$ 10."*
-
-Para fluxos v2, mencione produtos cadastrados e use ferramentas `v2*` (ex.: checkout com `items` de produtos já criados).
+- Conferir vendas: *"Liste os checkouts pagos dos últimos 7 dias e resuma valores."*
+- Assinatura: *"Crie um produto mensal de R$ 49 e uma assinatura para o cliente X."*
 
 ---
 
@@ -130,10 +149,11 @@ Para fluxos v2, mencione produtos cadastrados e use ferramentas `v2*` (ex.: chec
 
 | Situação | O que verificar |
 |----------|------------------|
-| Erro de API key | Cursor/Claude: `ABACATE_PAY_API_KEY` no `env` da config. HTTP: header `Authorization` ou `X-API-Key`. |
-| *Version mismatch* | Chave v1 só com tools sem `v2`; chave v2 só com tools `v2*`. |
-| MCP não conecta | Caminho absoluto para `src/index.ts`, Bun instalado, reiniciar o app após mudar config. |
+| Erro de API key | Cursor/Claude local: `ABACATE_PAY_API_KEY` no `env` da config. HTTP: header `Authorization` ou `X-API-Key`, ou conecte via OAuth. |
+| MCP não conecta (local) | Caminho absoluto para `src/index.ts`, Bun instalado, reiniciar o app após mudar config. |
+| Claude.ai não conecta (remoto) | Confirme que está usando o fluxo OAuth (o conector do Claude.ai exige `/authorize`); não funciona apenas com header estático nesse cliente específico. |
 | Bun não encontrado | `bun --version`; instalação em [bun.sh](https://bun.sh). |
+| 401/403 em uma tool | A chave precisa ser de **API v2**; chaves v1 antigas não funcionam mais neste servidor. |
 
 ---
 

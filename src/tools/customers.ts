@@ -1,14 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
-export function registerV2CustomerTools(server: McpServer) {
+export function registerCustomerTools(server: McpServer) {
   server.tool(
-    "v2CreateCustomer",
-    "Cria um cliente (API v2 — exige chave v2). Apenas email é obrigatório.",
+    "createCustomer",
+    "Cria um cliente. Apenas email é obrigatório.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       email: z.string().email(),
       name: z.string().optional(),
       cellphone: z.string().optional(),
@@ -27,7 +27,6 @@ export function registerV2CustomerTools(server: McpServer) {
         if (metadata) body.metadata = metadata;
 
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/customers/create",
           apiKey,
           sessionId: extra.sessionId,
@@ -50,10 +49,10 @@ export function registerV2CustomerTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListCustomers",
-    "Lista clientes com paginação (API v2 — chave v2).",
+    "listCustomers",
+    "Lista clientes com paginação.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
@@ -65,7 +64,6 @@ export function registerV2CustomerTools(server: McpServer) {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/customers/list${buildQuery({
             after: p.after,
             before: p.before,
@@ -96,18 +94,19 @@ export function registerV2CustomerTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetCustomer",
-    "Busca um cliente por id (API v2).",
+    "getCustomer",
+    "Busca um cliente por id, email ou taxId.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string().optional(),
+      email: z.string().optional(),
+      taxId: z.string().optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/customers/get${buildQuery({ id: p.id })}`,
+          path: `/customers/get${buildQuery({ id: p.id, email: p.email, taxId: p.taxId })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
@@ -128,17 +127,16 @@ export function registerV2CustomerTools(server: McpServer) {
   );
 
   server.tool(
-    "v2DeleteCustomer",
-    "Remove um cliente por id (API v2; irreversível).",
+    "deleteCustomer",
+    "Remove um cliente por id (irreversível).",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/customers/delete${buildQuery({ id: p.id })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

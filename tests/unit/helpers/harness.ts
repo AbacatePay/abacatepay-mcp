@@ -9,7 +9,7 @@ export type CollectedTool = {
   handler: ToolHandler;
 };
 
-/** Roda uma função registerXxxTools contra um McpServer falso e devolve um Map nome→tool. */
+/** Runs a registerXxxTools function against a fake McpServer and returns a name→tool Map. */
 export function collectTools(
   register: (server: { tool: (...args: any[]) => void }) => void
 ): Map<string, CollectedTool> {

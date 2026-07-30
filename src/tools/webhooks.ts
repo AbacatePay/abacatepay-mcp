@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
 const webhookEvent = z.enum([
   "checkout.completed",
@@ -16,28 +16,29 @@ const webhookEvent = z.enum([
   "subscription.trial_started",
   "subscription.cancelled",
   "subscription.renewed",
+  "subscription.plan_changed",
+  "subscription.payment_failed",
   "payout.completed",
   "payout.failed",
   "transfer.completed",
   "transfer.failed",
 ]);
 
-export function registerV2WebhookTools(server: McpServer) {
+export function registerWebhookTools(server: McpServer) {
   server.tool(
-    "v2CreateWebhook",
-    "Cria um webhook para receber eventos da loja (API v2 — chave v2). endpoint deve ser HTTPS público.",
+    "createWebhook",
+    "Cria um webhook para receber eventos da loja. endpoint deve ser HTTPS público. Requer que a loja tenha webhooks v2 habilitados.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       name: z.string().describe("Nome identificador do webhook."),
       endpoint: z.string().url().describe("URL HTTPS que recebe as notificações."),
-      secret: z.string().describe("Segredo usado para autenticar o webhook."),
+      secret: z.string().describe("Segredo usado para autenticar o webhook (você define; não é gerado pela API)."),
       events: z.array(webhookEvent).min(1).describe("Eventos a assinar."),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/webhooks/create",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -60,10 +61,10 @@ export function registerV2WebhookTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListWebhooks",
-    "Lista webhooks da loja com paginação (API v2 — chave v2).",
+    "listWebhooks",
+    "Lista webhooks da loja com paginação.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       search: z.string().optional(),
       after: z.string().optional(),
       before: z.string().optional(),
@@ -74,7 +75,6 @@ export function registerV2WebhookTools(server: McpServer) {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/webhooks/list${buildQuery({
             limit: p.limit,
             search: p.search,
@@ -97,17 +97,16 @@ export function registerV2WebhookTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetWebhook",
-    "Busca um webhook por id (API v2 — chave v2).",
+    "getWebhook",
+    "Busca um webhook por id.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string().describe("ID do webhook (webh_...)."),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/webhooks/get${buildQuery({ id: p.id })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -121,22 +120,21 @@ export function registerV2WebhookTools(server: McpServer) {
   );
 
   server.tool(
-    "v2DeleteWebhook",
-    "Remove um webhook da loja (API v2 — chave v2). Irreversível.",
+    "deleteWebhook",
+    "Remove um webhook da loja (irreversível).",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       id: z.string().describe("ID do webhook (webh_...)."),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: "/webhooks/delete",
+          path: `/webhooks/delete${buildQuery({ id: p.id })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "POST",
-          body: JSON.stringify({ id: p.id }),
+          body: "{}",
         });
         return { content: [{ type: "text", text: `Webhook removido: ${res.data?.id ?? p.id}` }] };
       } catch (e) {

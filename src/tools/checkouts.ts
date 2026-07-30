@@ -1,28 +1,47 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { makeAbacatePayRequest } from "../../http/api.js";
-import { buildQuery, paginationHint, toolError, v2ApiKey } from "./helpers.js";
+import { makeAbacatePayRequest } from "../http/api.js";
+import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
 
 const checkoutItem = z
   .object({
     id: z.string().describe("ID público do produto na loja (prod_...)"),
-    quantity: z.number().min(1),
+    quantity: z.number().min(1).default(1),
   })
   .strict();
 
-export function registerV2CheckoutTools(server: McpServer) {
+const feeValue = z.object({ value: z.number().min(0) }).strict();
+
+const checkoutStatus = z.enum([
+  "PENDING",
+  "EXPIRED",
+  "CANCELLED",
+  "PAID",
+  "UNDER_DISPUTE",
+  "REFUNDED",
+  "REDEEMED",
+  "APPROVED",
+  "FAILED",
+]);
+
+export function registerCheckoutTools(server: McpServer) {
   server.tool(
-    "v2CreateCheckout",
-    "Cria checkout com itens de produto já cadastrados (API v2 — chave v2).",
+    "createCheckout",
+    "Cria checkout de pagamento único (ONE_TIME) com itens de produto já cadastrados.",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       items: z.array(checkoutItem).min(1),
-      methods: z.array(z.enum(["PIX", "CARD"])).min(1).optional(),
+      methods: z.array(z.enum(["PIX", "CARD", "BOLETO"])).min(1).optional().describe("Padrão: PIX e CARD."),
+      card: z.object({ maxInstallments: z.number().int().min(1).max(12) }).strict().optional(),
       returnUrl: z.string().url().optional(),
       completionUrl: z.string().url().optional(),
       customerId: z.string().optional(),
       coupons: z.array(z.string()).max(50).optional(),
       externalId: z.string().optional(),
+      upSellProductId: z.string().optional(),
+      interest: feeValue.optional(),
+      fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
+      dueDate: z.string().optional().describe("YYYY-MM-DD"),
       metadata: z.record(z.unknown()).optional(),
     },
     async (params, extra) => {
@@ -30,15 +49,19 @@ export function registerV2CheckoutTools(server: McpServer) {
       try {
         const body: Record<string, unknown> = { items: p.items };
         if (p.methods) body.methods = p.methods;
+        if (p.card) body.card = p.card;
         if (p.returnUrl) body.returnUrl = p.returnUrl;
         if (p.completionUrl) body.completionUrl = p.completionUrl;
         if (p.customerId) body.customerId = p.customerId;
         if (p.coupons?.length) body.coupons = p.coupons;
         if (p.externalId) body.externalId = p.externalId;
+        if (p.upSellProductId) body.upSellProductId = p.upSellProductId;
+        if (p.interest) body.interest = p.interest;
+        if (p.fine) body.fine = p.fine;
+        if (p.dueDate) body.dueDate = p.dueDate;
         if (p.metadata) body.metadata = p.metadata;
 
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/checkouts/create",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -61,33 +84,38 @@ export function registerV2CheckoutTools(server: McpServer) {
   );
 
   server.tool(
-    "v2ListCheckouts",
-    "Lista checkouts (API v2).",
+    "listCheckouts",
+    "Lista checkouts (pagamento único).",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
+      keyword: z.string().optional(),
+      status: checkoutStatus.optional(),
+      customerId: z.string().optional(),
       externalId: z.string().optional(),
-      status: z.enum(["PENDING", "EXPIRED", "CANCELLED", "PAID", "REFUNDED"]).optional(),
-      email: z.string().optional(),
-      taxId: z.string().optional(),
+      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: `/checkouts/list${buildQuery({
             after: p.after,
             before: p.before,
             limit: p.limit,
             id: p.id,
-            externalId: p.externalId,
+            keyword: p.keyword,
             status: p.status,
-            email: p.email,
-            taxId: p.taxId,
+            customerId: p.customerId,
+            externalId: p.externalId,
+            method: p.method,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
@@ -105,18 +133,25 @@ export function registerV2CheckoutTools(server: McpServer) {
   );
 
   server.tool(
-    "v2GetCheckout",
-    "Obtém um checkout por id (API v2).",
+    "getCheckout",
+    "Obtém um checkout por id, externalId, customerId ou method.",
     {
-      apiKey: v2ApiKey,
-      id: z.string(),
+      apiKey: apiKeyParam(),
+      id: z.string().optional(),
+      externalId: z.string().optional(),
+      customerId: z.string().optional(),
+      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
-          path: `/checkouts/get${buildQuery({ id: p.id })}`,
+          path: `/checkouts/get${buildQuery({
+            id: p.id,
+            externalId: p.externalId,
+            customerId: p.customerId,
+            method: p.method,
+          })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "GET",
@@ -129,10 +164,34 @@ export function registerV2CheckoutTools(server: McpServer) {
   );
 
   server.tool(
-    "v2RefundCheckout",
-    "Reembolsa integralmente um checkout pago (API v2 — chave v2). Reembolso parcial não é suportado.",
+    "deleteCheckout",
+    "Remove um checkout (irreversível).",
     {
-      apiKey: v2ApiKey,
+      apiKey: apiKeyParam(),
+      id: z.string(),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          path: `/checkouts/delete${buildQuery({ id: p.id })}`,
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: "{}",
+        });
+        return { content: [{ type: "text", text: `Checkout removido: ${res.data?.id ?? p.id}` }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "refundCheckout",
+    "Reembolsa integralmente um checkout pago. Reembolso parcial não é suportado.",
+    {
+      apiKey: apiKeyParam(),
       id: z.string().describe("ID público do recurso (char_/pix_char_/card_/bill_)."),
       reason: z.string().max(500).optional().describe("Motivo do reembolso."),
     },
@@ -142,15 +201,15 @@ export function registerV2CheckoutTools(server: McpServer) {
         const body: Record<string, unknown> = { id: p.id };
         if (p.reason) body.reason = p.reason;
         const res = await makeAbacatePayRequest<any>({
-          version: "v2",
           path: "/checkouts/refund",
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "POST",
           body: JSON.stringify(body),
         });
+        const d = res.data;
         return {
-          content: [{ type: "text", text: `Checkout reembolsado\nrefund: ${res.data?.refundPublicId}` }],
+          content: [{ type: "text", text: `Checkout reembolsado\nrefund: ${d?.id}\nstatus: ${d?.status}` }],
         };
       } catch (e) {
         return toolError(e);

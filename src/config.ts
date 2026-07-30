@@ -36,10 +36,6 @@ if (isMainModule && !isHttpServerEntry && !process.env.NODE_ENV?.includes('test'
   }
 }
 
-/** @deprecated use ABACATE_PAY_API_BASE_V1 */
-export const ABACATE_PAY_API_BASE = "https://api.abacatepay.com/v1";
-
-export const ABACATE_PAY_API_BASE_V1 = "https://api.abacatepay.com/v1";
-export const ABACATE_PAY_API_BASE_V2 = "https://api.abacatepay.com/v2";
+export const ABACATE_PAY_API_BASE = "https://api.abacatepay.com/v2";
 
 export const USER_AGENT = "abacatepay-mcp/2.0";

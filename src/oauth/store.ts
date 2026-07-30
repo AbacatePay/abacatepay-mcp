@@ -39,11 +39,31 @@ db.run(`
     code_challenge        TEXT NOT NULL,
     code_challenge_method TEXT NOT NULL DEFAULT 'S256',
     api_key_enc           TEXT NOT NULL,
-    expires_at            INTEGER NOT NULL
+    expires_at            INTEGER NOT NULL,
+    scope                 TEXT,
+    resource              TEXT
   )
 `);
 
-// Remove any codes that expired before this process started
+// ---------------------------------------------------------------------------
+// Schema migrations
+// ---------------------------------------------------------------------------
+
+const { user_version: schemaVersion } = db.query("PRAGMA user_version").get() as { user_version: number };
+
+if (schemaVersion < 1) {
+  // Existing DBs on v0 schema don't have scope/resource columns yet.
+  // ALTER TABLE fails silently if the column already exists (fresh DBs).
+  for (const col of ["scope TEXT", "resource TEXT"]) {
+    try { db.run(`ALTER TABLE oauth_codes ADD COLUMN ${col}`); } catch { /* already exists */ }
+  }
+  db.run("PRAGMA user_version = 1");
+}
+
+// ---------------------------------------------------------------------------
+// Startup cleanup
+// ---------------------------------------------------------------------------
+
 db.run("DELETE FROM oauth_codes WHERE expires_at < ?", [Date.now()]);
 
 // ---------------------------------------------------------------------------
@@ -58,10 +78,15 @@ const stmts = {
     "SELECT client_id, secret_enc, redirect_uris, client_name FROM oauth_clients WHERE client_id = $id"
   ),
   insertCode: db.prepare(
-    "INSERT INTO oauth_codes (code, client_id, redirect_uri, code_challenge, code_challenge_method, api_key_enc, expires_at) VALUES ($code, $clientId, $redirectUri, $codeChallenge, $codeChallengeMethod, $apiKeyEnc, $expiresAt)"
+    `INSERT INTO oauth_codes
+       (code, client_id, redirect_uri, code_challenge, code_challenge_method, api_key_enc, expires_at, scope, resource)
+     VALUES
+       ($code, $clientId, $redirectUri, $codeChallenge, $codeChallengeMethod, $apiKeyEnc, $expiresAt, $scope, $resource)`
   ),
   selectCode: db.prepare(
-    "SELECT code, client_id, redirect_uri, code_challenge, code_challenge_method, api_key_enc, expires_at FROM oauth_codes WHERE code = $code"
+    `SELECT code, client_id, redirect_uri, code_challenge, code_challenge_method,
+            api_key_enc, expires_at, scope, resource
+     FROM oauth_codes WHERE code = $code`
   ),
   deleteCode: db.prepare("DELETE FROM oauth_codes WHERE code = $code"),
   deleteExpiredCodes: db.prepare("DELETE FROM oauth_codes WHERE expires_at < $now"),
@@ -86,6 +111,8 @@ export interface AuthCode {
   codeChallengeMethod: "S256";
   apiKey: string;
   expiresAt: number;
+  scope?: string;
+  resource?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,9 +146,16 @@ export function getClient(clientId: string): OAuthClient | undefined {
 
   if (!row) return undefined;
 
+  let clientSecret: string;
+  try {
+    clientSecret = decrypt(row.secret_enc, encKey);
+  } catch {
+    return undefined;
+  }
+
   return {
     clientId: row.client_id,
-    clientSecret: decrypt(row.secret_enc, encKey),
+    clientSecret,
     redirectUris: JSON.parse(row.redirect_uris) as string[],
     clientName: row.client_name ?? undefined,
   };
@@ -135,7 +169,9 @@ export function createAuthCode(
   clientId: string,
   redirectUri: string,
   codeChallenge: string,
-  apiKey: string
+  apiKey: string,
+  scope?: string,
+  resource?: string,
 ): string {
   const code = randomUUID();
 
@@ -147,12 +183,14 @@ export function createAuthCode(
     $codeChallengeMethod: "S256",
     $apiKeyEnc: encrypt(apiKey, encKey),
     $expiresAt: Date.now() + 5 * 60 * 1000,
+    $scope: scope ?? null,
+    $resource: resource ?? null,
   });
 
   return code;
 }
 
-/** Atomically consume a code: deletes it and returns the payload, or undefined if missing/expired. */
+/** Atomically consume a code: deletes it and returns the payload, or undefined if missing/expired/tampered. */
 export function consumeAuthCode(code: string): AuthCode | undefined {
   stmts.deleteExpiredCodes.run({ $now: Date.now() });
 
@@ -164,6 +202,8 @@ export function consumeAuthCode(code: string): AuthCode | undefined {
     code_challenge_method: string;
     api_key_enc: string;
     expires_at: number;
+    scope: string | null;
+    resource: string | null;
   } | null;
 
   if (!row) return undefined;
@@ -172,13 +212,23 @@ export function consumeAuthCode(code: string): AuthCode | undefined {
 
   if (Date.now() > row.expires_at) return undefined;
 
+  let apiKey: string;
+  try {
+    apiKey = decrypt(row.api_key_enc, encKey);
+  } catch {
+    // Decryption failure means key rotation or tampered row — treat as invalid
+    return undefined;
+  }
+
   return {
     code: row.code,
     clientId: row.client_id,
     redirectUri: row.redirect_uri,
     codeChallenge: row.code_challenge,
     codeChallengeMethod: "S256",
-    apiKey: decrypt(row.api_key_enc, encKey),
+    apiKey,
     expiresAt: row.expires_at,
+    scope: row.scope ?? undefined,
+    resource: row.resource ?? undefined,
   };
 }
