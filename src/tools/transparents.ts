@@ -225,8 +225,7 @@ export function registerTransparentTools(server: McpServer) {
 
   server.tool(
     "listTransparent",
-    "Lista QRs PIX e boletos transparentes (lista heterogênea). Este endpoint é observadamente instável no servidor " +
-      "(falha de forma intermitente mesmo sem parâmetros, independente da requisição); tente novamente em caso de erro.",
+    "Lista QRs PIX e boletos transparentes (lista heterogênea).",
     {
       apiKey: apiKeyParam(),
       after: z.string().optional(),

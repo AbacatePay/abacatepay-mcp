@@ -12,6 +12,7 @@
     "inspector": "bun run scripts/inspector.js",
     "test": "bun test tests/unit",
     "test:smoke": "ABACATE_PAY_SMOKE=1 bun test ./tests/smoke/read.smoke.ts",
+    "test:investigate": "bun test tests/investigate",
     "lint": "eslint src/ scripts/ --ext .ts,.js",
     "lint:fix": "eslint src/ scripts/ --ext .ts,.js --fix",
     "security": "bun audit && bun run lint",
