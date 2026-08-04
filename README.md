@@ -1,24 +1,14 @@
-# 🥑 Abacate Pay MCP Server
+# Abacate Pay MCP Server
 
-Um servidor MCP (Model Context Protocol) para integração com a API do Abacate Pay, permitindo gerenciar pagamentos, clientes e cobranças diretamente através de assistentes de IA como Claude e Cursor.
+Servidor [MCP](https://modelcontextprotocol.io) para usar a [API v2 da Abacate Pay](https://docs.abacatepay.com/pages/reference/introduction) no **Claude**, no **Cursor** ou por **URL remota** (Claude.ai, automações, outras integrações).
 
-## ✨ Multi-Tenancy
+**Conteúdo:** [Início rápido](#início-rápido) · [Como rodar o servidor](#como-rodar-o-servidor) · [Conectar via OAuth (Claude.ai / remoto)](#conectar-via-oauth-claudeai--remoto) · [Ferramentas](#ferramentas) · [Problemas comuns](#problemas-comuns)
 
-**🔐 Multi-tenancy ativo!** O servidor suporta múltiplos clientes simultaneamente. No modo HTTP, cada requisição pode incluir sua própria chave de API via header `Authorization` ou `X-API-Key`, permitindo que diferentes usuários/organizações usem o mesmo servidor MCP com suas respectivas contas do Abacate Pay.
+---
 
-## O que você pode fazer
+## Início rápido
 
-- 👥 **Gerenciar clientes**: Criar e listar clientes
-- 💰 **Criar cobranças**: Links de pagamento e faturas  
-- 📱 **QR Codes PIX**: Pagamentos instantâneos
-- 🎫 **Cupons de desconto**: Promoções e descontos
-- 🔄 **Simular pagamentos**: Testar fluxos em desenvolvimento
-
-## 🚀 Instalação e Configuração
-
-> **💡 Dica**: Se você só precisa usar o servidor MCP via HTTP (AgentKit, n8n, etc.), não precisa instalar localmente! Use o servidor público em `https://mcp.abacatepay.com/mcp` - veja a seção [Uso Remoto e Automação](#-uso-remoto-e-automação).
-
-### 1. Clone o repositório
+**Pré-requisito:** [Bun](https://bun.sh) 1.x.
 
 ```bash
 git clone https://github.com/AbacatePay/abacatepay-mcp.git
@@ -26,224 +16,148 @@ cd abacatepay-mcp
 bun install
 ```
 
-**📋 Pré-requisitos:**
-- [Bun](https://bun.sh) instalado (versão 1.0.0 ou superior)
+**Chave de API:** [Abacate Pay](https://www.abacatepay.com) → **Integrar** → **API Keys**. Use uma chave de **API v2** — é a única versão suportada por este servidor.
 
-### 2. Configure no Claude Desktop
+**Claude Desktop / Cursor** (modo local, processo próprio):
 
 ```json
 {
   "mcpServers": {
     "abacate-pay": {
       "command": "bun",
-      "args": ["/caminho/completo/para/abacatepay-mcp/src/index.ts"],
+      "args": ["/CAMINHO/absoluto/para/abacatepay-mcp/src/index.ts"],
       "env": {
-        "ABACATE_PAY_API_KEY": "sua_api_key_aqui"
+        "ABACATE_PAY_API_KEY": "sua_chave"
       }
     }
   }
 }
 ```
 
-### 3. Configure no Cursor
-
-```json
-{
-  "mcp.servers": {
-    "abacate-pay": {
-      "command": "bun",
-      "args": ["/caminho/completo/para/abacatepay-mcp/src/index.ts"],
-      "env": {
-        "ABACATE_PAY_API_KEY": "sua_api_key_aqui"
-      }
-    }
-  }
-}
-```
-
-**⚠️ Importante**: 
-- Substitua `/caminho/completo/para/abacatepay-mcp/` pelo caminho real onde você clonou o repositório
-- No modo stdio (Cursor/Claude Desktop), a API key deve ser configurada via variável de ambiente `env` na configuração do cliente
-
-## 🔑 Como obter sua API Key
-
-1. Acesse [Abacate Pay](https://www.abacatepay.com)
-2. Vá em **Integrar** → **API Keys**
-3. Copie sua API Key
-
-## 📝 Exemplos de Uso
-
-### 🎯 Campanha com Influencer
-```
-"Eu contratei um influencer chamado Alex para divulgar meu negócio. Você pode criar um cupom com 15% de desconto usando o código ALEX15 que vale para até 100 usos? Preciso acompanhar o desempenho da campanha."
-```
-
-### 🔍 Investigação de Cobranças
-```
-"Tive uma cobrança estranha ontem que não reconheço. Você pode buscar todas as cobranças de ontem e me mostrar os detalhes para eu verificar o que pode ter acontecido?"
-```
-
-### 💼 Novo Cliente Corporativo  
-```
-"Acabei de fechar um contrato com a empresa TechSolutions LTDA (CNPJ: 12.345.678/0001-90). Pode criar o cadastro deles com o email contato@techsolutions.com e telefone (11) 3456-7890? Depois preciso gerar um QR Code PIX de R$ 10 para o pagamento."
-```
-
-## 🔐 Como Funciona
-
-O servidor MCP funciona de duas formas diferentes dependendo de como você vai usá-lo:
-
-### 📱 Modo stdio (Cursor, Claude Desktop)
-
-No modo stdio, o servidor se comunica via entrada/saída padrão. A API key deve ser configurada via variável de ambiente na configuração do cliente.
-
-**Exemplo de uso:**
-```
-"Crie um cliente chamado João Silva, com email joao@exemplo.com, 
-celular (11) 99999-9999 e CPF 123.456.789-01"
-```
-
-A API key é obtida automaticamente da variável de ambiente `ABACATE_PAY_API_KEY` configurada no cliente.
-
-### 🌐 Modo HTTP (AgentKit, n8n, automações)
-
-No modo HTTP, o servidor aceita requisições HTTP e suporta multi-tenancy através de headers HTTP.
-
-**Autenticação via Header:**
-
-A API key pode ser fornecida de duas formas:
-
-1. **Via Header `Authorization` (Recomendado):**
-```bash
-Authorization: Bearer sua_api_key_aqui
-```
-
-2. **Via Header `X-API-Key`:**
-```bash
-X-API-Key: sua_api_key_aqui
-```
-
-**⚠️ Importante**: No modo HTTP, se você passar a API key no header, não precisa passá-la como parâmetro da ferramenta. O servidor automaticamente usa a chave do header.
-
-### Vantagens
-
-✅ **Múltiplos usuários**: Diferentes pessoas podem usar o mesmo servidor MCP  
-✅ **Isolamento de dados**: Cada API key acessa apenas seus próprios dados  
-✅ **Flexibilidade**: Modo stdio para uso local, modo HTTP para automações  
-✅ **Segurança**: Credenciais via headers HTTP ou variáveis de ambiente  
-✅ **Escalabilidade**: Fácil de compartilhar entre equipes  
-✅ **Multi-tenancy**: Suporte a múltiplos clientes simultâneos no modo HTTP  
-
-## 🌐 Uso Remoto e Automação
-
-### 🚀 Servidor Público Disponível
-
-**✨ Servidor MCP já deployado e disponível!**
-
-Você pode usar o servidor MCP da Abacate Pay diretamente sem precisar instalar localmente:
-
-**Endpoint:** `https://mcp.abacatepay.com/mcp`
-
-Basta configurar sua API key no header `Authorization` ou `X-API-Key` e começar a usar!
-
-### HTTP Server para Automação
-
-Para usar com ferramentas como n8n, Zapier, ou aplicações customizadas, você pode:
-
-**Opção 1: Usar o servidor público (Recomendado)**
-- Endpoint: `https://mcp.abacatepay.com/mcp`
-- Sem necessidade de instalação ou configuração
-
-**Opção 2: Rodar localmente**
-```bash
-# Start HTTP server
-bun run start:http
-
-# Ou com porta customizada
-MCP_PORT=8080 bun run start:http
-```
-
-### Exemplo de Integração
-
-**HTTP Request (n8n/Zapier) - Usando servidor público:**
-```bash
-POST https://mcp.abacatepay.com/mcp
-Headers:
-  Authorization: Bearer sua_api_key_aqui
-  Content-Type: application/json
-
-Body:
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "createPixQrCode",
-    "arguments": {
-      "amount": 1000,
-      "description": "Pagamento via automação"
-    }
-  }
-}
-```
-
-**JavaScript/Node.js:**
-```javascript
-async function createCustomer(customerData) {
-  const response = await fetch('https://mcp.abacatepay.com/mcp', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer sua_api_key_aqui',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'tools/call',
-      params: {
-        name: 'createCustomer',
-        arguments: customerData
-      }
-    })
-  });
-  return response.json();
-}
-```
-
-## 🐛 Problemas Comuns
-
-### Erro de API Key
-```
-❌ Erro: API key é obrigatória. Configure via header HTTP ou configure globalmente via variável de ambiente ABACATE_PAY_API_KEY.
-```
-**Solução**: 
-- **Modo stdio (Cursor/Claude Desktop)**: Verifique se a API key está configurada corretamente na variável de ambiente `env` do arquivo de configuração
-- **Modo HTTP**: Verifique se a API key está sendo enviada no header `Authorization: Bearer <key>` ou `X-API-Key: <key>`
-
-### MCP Server não conecta
-**Solução**: 
-1. Verifique se o caminho para o arquivo está correto
-2. Reinicie o Claude Desktop/Cursor após adicionar a configuração
-3. Certifique-se de que o Bun está instalado e funcionando
-
-### Erro de permissão
-**Solução**: Certifique-se de que o Bun está instalado corretamente:
-```bash
-# Verificar instalação do Bun
-bun --version
-
-# Se necessário, instalar o Bun
-curl -fsSL https://bun.sh/install | bash
-```
-
-## 🤝 Contribuição
-
-Quer contribuir? Veja o [Guia de Contribuição](CONTRIBUTING.md).
-
-## 📄 Licença
-
-MIT - veja [LICENSE](LICENSE) para detalhes.
+Muitas ferramentas também aceitam `apiKey` na própria chamada, para usar outra chave quando precisar (útil para operar em modo teste e produção sem trocar a configuração).
 
 ---
 
+## Como rodar o servidor
 
+Escolha **uma** opção.
 
+### No seu computador com Cursor ou Claude Desktop (o mais simples)
+
+O próprio app **liga** o servidor para você via stdio (`bun run src/index.ts`). Você só configura o caminho e a variável `ABACATE_PAY_API_KEY`, como no [início rápido](#início-rápido). Não precisa de URL, porta ou OAuth.
+
+### Na internet (HTTP) — Claude.ai, n8n, automações
+
+Use o endpoint público quando você integra com Claude.ai (conector remoto), n8n, outras automações, ou quer configuração remota no cliente (sem `command`/processo local).
+
+| Onde roda | Endereço |
+|-----------|----------|
+| Servidor público Abacate Pay | `https://mcp.abacatepay.com/mcp` |
+
+Esse endpoint aceita dois modos de autenticação:
+
+1. **`Authorization: Bearer <chave-v2>`** (ou header `X-API-Key`) diretamente — simples para clientes que já guardam a chave (n8n, scripts, Cursor apontando para a URL).
+2. **OAuth 2.0** — obrigatório para o **conector remoto do Claude.ai**, que não aceita headers estáticos e exige um fluxo de autorização. Veja a seção abaixo.
+
+Exemplo de configuração remota (Cursor, com header direto):
+
+```json
+{
+  "mcpServers": {
+    "abacatepay": {
+      "url": "https://mcp.abacatepay.com/mcp",
+      "headers": {
+        "Authorization": "Bearer API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Local, servindo HTTP (para testar OAuth ou o modo multi-tenant)
+
+```bash
+bun run src/http-server.ts
+# porta padrão 3000; ajuste com MCP_PORT ou PORT
+```
+
+---
+
+## Conectar via OAuth (Claude.ai / remoto)
+
+O servidor implementa um Authorization Server OAuth 2.0 completo (Dynamic Client Registration + Authorization Code + PKCE), necessário porque **o conector remoto do Claude.ai exige OAuth** — não é possível conectar apenas com um header estático nesse cliente.
+
+Fluxo, do ponto de vista do Claude/cliente MCP:
+
+1. O cliente descobre os metadados em `/.well-known/oauth-protected-resource` e `/.well-known/oauth-authorization-server`.
+2. Registra-se dinamicamente em `POST /register` (RFC 7591).
+3. Abre `GET /authorize` no navegador do usuário — uma página simples pede a **chave de API v2** da Abacate Pay (não uma senha de conta).
+4. Após validar a chave contra a API (`GET /v2/stores/get`), o servidor emite um código de autorização e redireciona de volta ao cliente.
+5. O cliente troca o código por um token em `POST /token` (com verificação PKCE). O "token" retornado é, na prática, a própria chave de API v2, guardada de forma criptografada (AES-256-GCM) no SQLite do servidor até esse ponto.
+6. O cliente usa esse token como `Authorization: Bearer` normalmente em `/mcp`.
+
+Não há conta de usuário nem senha do Abacate Pay envolvida — apenas a chave de API do lojista, o mesmo modelo de autenticação usado no header direto.
+
+**Configuração de produção (Fly.io):** o banco de dados OAuth (SQLite) precisa de um volume persistente e de uma chave de criptografia fixa:
+
+```bash
+fly volumes create oauth_data --size 1 --region gru
+fly secrets set OAUTH_ENCRYPTION_KEY=$(openssl rand -hex 32)
+```
+
+Isso já está configurado em `fly.toml` (`OAUTH_DB_PATH=/data/oauth.db`, montado no volume `oauth_data`). Localmente, se `OAUTH_ENCRYPTION_KEY` não estiver definida, uma chave é gerada e persistida ao lado do banco (`oauth.key`), com aviso no console.
+
+---
+
+## Ferramentas
+
+Nomes exatos das tools são os registrados no código (`src/tools/`); a lista completa aparece no cliente MCP ao conectar. Resumo por recurso:
+
+| Recurso | Tools |
+|---|---|
+| Clientes | `createCustomer`, `listCustomers`, `getCustomer`, `deleteCustomer` |
+| Cupons | `createCoupon`, `listCoupons`, `getCoupon`, `deleteCoupon`, `toggleCoupon` |
+| Produtos | `createProduct`, `listProducts`, `getProduct`, `deleteProduct` |
+| Checkouts (pagamento único) | `createCheckout`, `listCheckouts`, `getCheckout`, `deleteCheckout`, `refundCheckout` |
+| Links de pagamento (reutilizáveis) | `createPaymentLink`, `listPaymentLinks`, `getPaymentLink`, `deletePaymentLink`, `refundPaymentLink` |
+| Checkout transparente (PIX/Boleto) | `createTransparentPix`, `createTransparentBoleto`, `getTransparent`, `checkTransparentPix`, `simulateTransparentPixPayment`, `listTransparent`, `refundTransparent` |
+| Payouts (saque para a própria chave Pix) | `createPayout`, `getPayout`, `listPayouts` |
+| Envio de Pix (para terceiros) | `sendPix`, `getPixTransaction`, `listPixTransactions` |
+| Assinaturas | `createSubscription`, `listSubscriptions`, `getSubscription`, `cancelSubscription`, `changeSubscriptionPlan`, `recordSubscriptionUsage` |
+| Loja | `getStore`, `listStores` |
+| Webhooks | `createWebhook`, `listWebhooks`, `getWebhook`, `deleteWebhook` |
+
+Implementação: um arquivo por recurso em `src/tools/` (ex.: `src/tools/checkouts.ts`).
+
+**Notas importantes de negócio, refletidas nas ferramentas:**
+- Reembolsos (`refund*`) são sempre integrais — a API v2 não suporta reembolso parcial.
+- `checkTransparentPix` e `simulateTransparentPixPayment` funcionam apenas para PIX; boleto não tem simulação de pagamento.
+- `simulateTransparentPixPayment` só funciona com uma chave de **teste** (modo dev).
+- `listPixTransactions`/`getPixTransaction` exigem `id`; a API não pagina nem filtra por status nesse endpoint.
+- `changeSubscriptionPlan` e `cancelSubscription` são irreversíveis; não há suporte a pró-rata no cancelamento.
+
+## Ideias de prompts
+
+- Produto + checkout: *"Crie um produto 'Consultoria' de R$ 150 e um checkout PIX+cartão para ele."*
+- Cupom para campanha: *"Crie um cupom 15% com código ALEX15, máximo 100 usos."*
+- Conferir vendas: *"Liste os checkouts pagos dos últimos 7 dias e resuma valores."*
+- Assinatura: *"Crie um produto mensal de R$ 49 e uma assinatura para o cliente X."*
+
+---
+
+## Problemas comuns
+
+| Situação | O que verificar |
+|----------|------------------|
+| Erro de API key | Cursor/Claude local: `ABACATE_PAY_API_KEY` no `env` da config. HTTP: header `Authorization` ou `X-API-Key`, ou conecte via OAuth. |
+| MCP não conecta (local) | Caminho absoluto para `src/index.ts`, Bun instalado, reiniciar o app após mudar config. |
+| Claude.ai não conecta (remoto) | Confirme que está usando o fluxo OAuth (o conector do Claude.ai exige `/authorize`); não funciona apenas com header estático nesse cliente específico. |
+| Bun não encontrado | `bun --version`; instalação em [bun.sh](https://bun.sh). |
+| 401/403 em uma tool | A chave precisa ser de **API v2**; chaves v1 antigas não funcionam mais neste servidor. |
+
+---
+
+## Contribuição e licença
+
+- Contribuição: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Licença: [LICENSE](LICENSE) (MIT)

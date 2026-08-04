@@ -138,6 +138,12 @@ build/
 # TernJS port file
 .tern-port
 
+# OAuth SQLite DB and encryption key (never commit)
+*.db
+*.db-wal
+*.db-shm
+*.key
+
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 

@@ -1,57 +1,16 @@
-// Sistema de contexto para armazenar dados por sessão MCP
-// Isso permite que as ferramentas acessem dados do contexto HTTP (como API keys)
+/** Per MCP streamable session id → API key (HTTP multi-tenant). */
 
-interface SessionContext {
-  apiKey?: string;
-  sessionId?: string;
+const sessionApiKeys = new Map<string, string>();
+
+export function setSessionApiKey(sessionId: string, apiKey: string): void {
+  sessionApiKeys.set(sessionId, apiKey);
 }
 
-// Map para armazenar contexto por sessionId
-const sessionContexts = new Map<string, SessionContext>();
-
-// Contexto da sessão atual (usado quando não há sessionId disponível)
-let currentSessionContext: SessionContext | null = null;
-
-// Session ID atual
-let currentSessionId: string | undefined = undefined;
-
-export function setSessionApiKey(sessionId: string | undefined, apiKey: string) {
-  if (sessionId) {
-    const context = sessionContexts.get(sessionId) || {};
-    context.apiKey = apiKey;
-    context.sessionId = sessionId;
-    sessionContexts.set(sessionId, context);
-  } else {
-    // Se não há sessionId, usa contexto global temporário
-    currentSessionContext = { apiKey, sessionId: undefined };
-  }
+export function getSessionApiKey(sessionId: string | undefined): string | undefined {
+  if (!sessionId) return undefined;
+  return sessionApiKeys.get(sessionId);
 }
 
-export function getSessionApiKey(sessionId?: string): string | undefined {
-  if (sessionId) {
-    const context = sessionContexts.get(sessionId);
-    if (context?.apiKey) {
-      return context.apiKey;
-    }
-  }
-  
-  // Tenta usar contexto global temporário
-  if (currentSessionContext?.apiKey) {
-    return currentSessionContext.apiKey;
-  }
-  
-  return undefined;
+export function clearSessionApiKey(sessionId: string): void {
+  sessionApiKeys.delete(sessionId);
 }
-
-export function clearSessionContext(sessionId: string) {
-  sessionContexts.delete(sessionId);
-}
-
-export function setCurrentSessionId(sessionId: string | undefined) {
-  currentSessionId = sessionId;
-}
-
-export function getCurrentSessionId(): string | undefined {
-  return currentSessionId;
-}
-

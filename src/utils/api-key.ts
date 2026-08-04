@@ -1,52 +1,54 @@
 import { validateApiKey } from "../config.js";
-import { getSessionApiKey, getCurrentSessionId } from "../context.js";
+import { getSessionApiKey } from "../context.js";
 
-/**
- * Resolve a API key na seguinte ordem de prioridade:
- * 1. API key fornecida como parâmetro
- * 2. API key do contexto da sessão (header HTTP)
- * 3. API key global (variável de ambiente)
- * 
- * @param apiKey - API key opcional fornecida como parâmetro
- * @returns API key resolvida ou null se não encontrada
- */
-export function resolveApiKey(apiKey?: string): string | null {
-  // 1. Prioridade: parâmetro fornecido (mas ignora valores placeholder/inválidos)
-  if (apiKey && apiKey.trim() !== '') {
-    // Ignora valores placeholder comuns que indicam que o usuário não forneceu uma chave real
-    const invalidPlaceholders = [
-      'sua_chave_api', 'sua-chave-api', 'sua_chave', 'sua-chave',
-      'your_api_key', 'your-api-key', 'your_api', 'your-api',
-      'api_key_here', 'api-key-here', 'api_key', 'api-key',
-      'chave_api', 'chave-api', 'chave', 'key'
-    ];
-    const normalizedApiKey = apiKey.toLowerCase().trim();
-    const isPlaceholder = invalidPlaceholders.some(placeholder => 
-      normalizedApiKey === placeholder.toLowerCase() || 
-      normalizedApiKey.includes(placeholder.toLowerCase())
-    );
-    
-    if (!isPlaceholder) {
-      return apiKey;
-    }
-  }
-  
-  // 2. Prioridade: contexto da sessão
-  const sessionId = getCurrentSessionId();
-  const sessionApiKey = getSessionApiKey(sessionId);
-  
-  if (sessionApiKey && sessionApiKey.trim() !== '') {
-    return sessionApiKey;
-  }
-  
-  // 3. Prioridade: variável global
-  const globalApiKey = validateApiKey();
-  
-  if (globalApiKey && globalApiKey.trim() !== '') {
-    return globalApiKey;
-  }
-  
-  return null;
+const INVALID_PLACEHOLDERS = [
+  "sua_chave_api",
+  "sua-chave-api",
+  "sua_chave",
+  "sua-chave",
+  "your_api_key",
+  "your-api-key",
+  "your_api",
+  "your-api",
+  "api_key_here",
+  "api-key-here",
+  "api_key",
+  "api-key",
+  "chave_api",
+  "chave-api",
+  "chave",
+  "key",
+];
+
+function isPlaceholderApiKey(apiKey: string): boolean {
+  const normalized = apiKey.toLowerCase().trim();
+  return INVALID_PLACEHOLDERS.some(
+    (p) => normalized === p || normalized.includes(p)
+  );
 }
 
+/**
+ * 1) Tool param (non-placeholder) → 2) session registry → 3) global env/argv
+ */
+export function resolveApiKey(
+  sessionId: string | undefined,
+  paramApiKey?: string
+): string | null {
+  if (paramApiKey?.trim()) {
+    if (!isPlaceholderApiKey(paramApiKey)) {
+      return paramApiKey;
+    }
+  }
 
+  const fromSession = getSessionApiKey(sessionId);
+  if (fromSession?.trim()) {
+    return fromSession;
+  }
+
+  const globalKey = validateApiKey();
+  if (globalKey?.trim()) {
+    return globalKey;
+  }
+
+  return null;
+}

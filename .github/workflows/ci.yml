@@ -56,6 +56,16 @@ jobs:
         fi
         echo "✅ Todos os tipos estão corretos"
 
+    - name: 🧪 Testes unitários
+      run: |
+        echo "🧪 Rodando testes unitários..."
+        env -u ABACATE_PAY_API_KEY bun test tests/unit
+        if [ $? -ne 0 ]; then
+          echo "❌ Testes falharam!"
+          exit 1
+        fi
+        echo "✅ Testes unitários passaram"
+
     - name: 🧪 Verificação do script inspector
       run: |
         echo "🧪 Testando script inspector..."

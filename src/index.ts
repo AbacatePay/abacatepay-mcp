@@ -6,7 +6,7 @@ import { registerAllTools } from "./tools/index.js";
 function createServer(): McpServer {
   const server = new McpServer({
     name: "abacatepay-mcp",
-    version: "1.0.0",
+    version: "2.0.0",
     capabilities: {
       resources: {},
       tools: {},
@@ -19,10 +19,15 @@ function createServer(): McpServer {
 }
 
 async function main() {
-  const server = createServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.log("🥑 Abacate Pay MCP Server rodando em stdio");
+  try {
+    const server = createServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("Abacate Pay MCP Server rodando em stdio");
+  } catch (error) {
+    console.error("Erro fatal em main():", error);
+    process.exit(1);
+  }
 }
 
 main();

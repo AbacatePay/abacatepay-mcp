@@ -19,7 +19,11 @@ export default [
         __filename: 'readonly',
         fetch: 'readonly',
         RequestInit: 'readonly',
-        Response: 'readonly'
+        HeadersInit: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Response: 'readonly',
+        AbortSignal: 'readonly'
       }
     },
     plugins: {

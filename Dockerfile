@@ -14,6 +14,6 @@ EXPOSE 3000
 
 # Add resource limits via Docker run flags
 # Use --cpus=1.0 and --memory=500m when running the container
-CMD ["bun", "run", "src/http/server.ts"]
+CMD ["bun", "run", "src/http-server.ts"]
 
 

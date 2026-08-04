@@ -1,0 +1,35 @@
+# fly.toml app configuration file generated for abacatepay-mcp on 2026-03-31T16:34:59-03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = 'abacatepay-mcp'
+primary_region = 'gru'
+
+[build]
+
+[env]
+  # Path inside the container where the OAuth SQLite DB is stored.
+  # Points at the persistent volume mounted below.
+  OAUTH_DB_PATH = "/data/oauth.db"
+  # OAUTH_ENCRYPTION_KEY must be set as a Fly secret (never in plain env):
+  #   fly secrets set OAUTH_ENCRYPTION_KEY=$(openssl rand -hex 32)
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512
+
+# Persistent volume for the OAuth SQLite DB and encryption key file.
+# Create once before first deploy:
+#   fly volumes create oauth_data --size 1 --region gru
+[[mounts]]
+  source = "oauth_data"
+  destination = "/data"

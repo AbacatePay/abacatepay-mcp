@@ -1,18 +1,22 @@
 import "./config.js";
 import express from "express";
-import type { Request, Response } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { clearSessionApiKey, setSessionApiKey } from "./context.js";
+import {
+  type RequestWithValidatedApiKey,
+  validateApiKeyMiddleware,
+} from "./http/middleware.js";
+import { oauthRouter } from "./oauth/routes.js";
 import { registerAllTools } from "./tools/index.js";
-import { setSessionApiKey, setCurrentSessionId, clearSessionContext } from "./context.js";
-import { validateApiKeyMiddleware } from "./http/middleware.js";
 
 function createServer(): McpServer {
   const server = new McpServer({
     name: "abacatepay-mcp",
-    version: "1.0.0",
+    version: "2.0.0",
     capabilities: {
       resources: {},
       tools: {},
@@ -25,140 +29,126 @@ function createServer(): McpServer {
 }
 
 async function main() {
-  const app = express();
-  app.use((express as any).json({ limit: '10mb' }));
+  try {
+    const app = express();
+    app.use((express as unknown as { json: (opts?: object) => RequestHandler }).json({
+      limit: "10mb",
+    }));
 
-  // Aplica o middleware de autenticação em todas as rotas /mcp
-  app.use('/mcp', validateApiKeyMiddleware);
+    app.use(oauthRouter);
+    app.use("/mcp", validateApiKeyMiddleware);
 
-  // Map to store transports by session ID
-  const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+    const transports = new Map<string, StreamableHTTPServerTransport>();
 
-  // Handle POST requests for client-to-server communication
-  app.post('/mcp', async (req: Request, res: Response) => {
-    // Armazena a API key validada no contexto da sessão
-    const validatedApiKey = (req as any).validatedApiKey;
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    
-    // Armazena a API key no contexto da sessão
-    if (validatedApiKey) {
-      setSessionApiKey(sessionId, validatedApiKey);
-      setCurrentSessionId(sessionId);
-    }
-    
-    let transport: StreamableHTTPServerTransport;
-
-    // eslint-disable-next-line security/detect-object-injection
-    if (sessionId && transports[sessionId]) {
-      // Reuse existing transport
-      // eslint-disable-next-line security/detect-object-injection
-      transport = transports[sessionId];
-      // Atualiza a API key no contexto quando reutiliza transporte
-      if (validatedApiKey) {
-        setSessionApiKey(sessionId, validatedApiKey);
-        setCurrentSessionId(sessionId);
+    app.post("/mcp", async (req: Request, res: Response) => {
+      const validatedApiKey = (req as RequestWithValidatedApiKey).validatedApiKey;
+      if (!validatedApiKey) {
+        res.status(403).json({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Forbidden: missing API key" },
+          id: null,
+        });
+        return;
       }
-    } else if (!sessionId && isInitializeRequest((req as any).body)) {
-      // New initialization request
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (initializedSessionId) => {
-          // Store the transport by session ID
-          // eslint-disable-next-line security/detect-object-injection
-          transports[initializedSessionId] = transport;
-          // Armazena a API key quando a sessão é inicializada
-          if (validatedApiKey) {
-            setSessionApiKey(initializedSessionId, validatedApiKey);
-            setCurrentSessionId(initializedSessionId);
+
+      const sessionIdHeader = req.headers["mcp-session-id"];
+      const sessionId =
+        typeof sessionIdHeader === "string" ? sessionIdHeader : undefined;
+
+      if (sessionId) {
+        setSessionApiKey(sessionId, validatedApiKey);
+      }
+
+      let transport: StreamableHTTPServerTransport | undefined;
+      if (sessionId) {
+        transport = transports.get(sessionId);
+      }
+
+      const body = (req as Request & { body?: unknown }).body;
+      if (!transport && !sessionId && body !== undefined && isInitializeRequest(body)) {
+        const keyForThisTransport = validatedApiKey;
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sid) => {
+            transports.set(sid, transport!);
+            setSessionApiKey(sid, keyForThisTransport);
+          },
+        });
+
+        transport.onclose = () => {
+          const sid = transport?.sessionId;
+          if (sid) {
+            transports.delete(sid);
+            clearSessionApiKey(sid);
           }
-        },
-        // DNS rebinding protection is disabled by default for backwards compatibility. If you are running this server
-        // locally, make sure to set:
-        // enableDnsRebindingProtection: true,
-        // allowedHosts: ['127.0.0.1'],
-      });
+        };
 
-      // Clean up transport when closed
-      transport.onclose = () => {
-        if (transport.sessionId) {
-          delete transports[transport.sessionId];
-          clearSessionContext(transport.sessionId);
-        }
-      };
+        const server = createServer();
+        await server.connect(transport);
+      }
 
-      const server = createServer();
+      if (!transport) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: No valid session ID provided",
+          },
+          id: null,
+        });
+        return;
+      }
 
-      // Connect to the MCP server
-      await server.connect(transport);
-    } else {
-      // Invalid request
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Bad Request: No valid session ID provided',
-        },
-        id: null,
-      });
-      return;
-    }
+      await transport.handleRequest(req, res, body);
+    });
 
-    // Define o contexto antes de processar a requisição
-    // Isso garante que as ferramentas possam acessar a API key
-    if (validatedApiKey && transport.sessionId) {
-      setSessionApiKey(transport.sessionId, validatedApiKey);
-      setCurrentSessionId(transport.sessionId);
-    }
-    
-    // Handle the request
-    await transport.handleRequest(req, res, (req as any).body);
-  });
+    const handleSessionRequest = async (req: Request, res: Response) => {
+      const validatedApiKey = (req as RequestWithValidatedApiKey).validatedApiKey;
+      if (!validatedApiKey) {
+        res.status(403).send("Forbidden: missing API key");
+        return;
+      }
 
-  // Reusable handler for GET and DELETE requests
-  const handleSessionRequest = async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    
-    // eslint-disable-next-line security/detect-object-injection
-    if (!sessionId || !transports[sessionId]) {
-      res.status(400).send('Invalid or missing session ID');
-      return;
-    }
-    
-    // eslint-disable-next-line security/detect-object-injection
-    const transport = transports[sessionId];
-    await transport.handleRequest(req, res);
-  };
+      const sessionIdHeader = req.headers["mcp-session-id"];
+      const sessionId =
+        typeof sessionIdHeader === "string" ? sessionIdHeader : undefined;
+      if (!sessionId) {
+        res.status(400).send("Invalid or missing session ID");
+        return;
+      }
 
-  // Handle GET requests for server-to-client notifications via SSE
-  app.get('/mcp', handleSessionRequest);
+      setSessionApiKey(sessionId, validatedApiKey);
 
-  // Handle DELETE requests for session termination
-  app.delete('/mcp', handleSessionRequest);
+      const transport = transports.get(sessionId);
+      if (!transport) {
+        res.status(400).send("Invalid or missing session ID");
+        return;
+      }
+      await transport.handleRequest(req, res);
+    };
 
-  // Get port from environment or use default
-  const port = parseInt(process.env.MCP_PORT || process.env.PORT || "3000");
+    app.get("/mcp", handleSessionRequest);
+    app.delete("/mcp", handleSessionRequest);
 
-  app.listen(port, () => {
-    console.log("\n╔═══════════════════════════════════════════════════════╗");
-    console.log("║     🥑 Abacate Pay MCP Server - HTTP Mode             ║");
-    console.log("╚═══════════════════════════════════════════════════════╝");
-    console.log("");
-    console.log(`  🚀 Servidor:     http://localhost:${port}`);
-    console.log(`  📡 Endpoint:     http://localhost:${port}/mcp`);
-    console.log(`  📖 Documentação: http://localhost:${port}/mcp/schema`);
-    console.log("");
-  });
-  
-  // Graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('\n🛑 Encerrando servidor...');
-    // Close all active transports
-    for (const transport of Object.values(transports)) {
-      await transport.close();
-    }
-    process.exit(0);
-  });
+    const port = parseInt(process.env.MCP_PORT || process.env.PORT || "3000", 10);
+
+    app.listen(port, () => {
+      console.error(`🚀 Abacate Pay MCP Server rodando em http://localhost:${port}`);
+      console.error(`📡 Endpoint: http://localhost:${port}/mcp`);
+      console.error(`📖 Documentação: http://localhost:${port}/mcp/schema`);
+    });
+
+    process.on("SIGINT", async () => {
+      console.error("\n🛑 Encerrando servidor...");
+      for (const t of transports.values()) {
+        await t.close();
+      }
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error("Erro fatal em main():", error);
+    process.exit(1);
+  }
 }
 
 main();
-
