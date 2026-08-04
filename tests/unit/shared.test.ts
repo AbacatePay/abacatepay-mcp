@@ -36,10 +36,10 @@ describe("toolError", () => {
 
 describe("apiKeyParam", () => {
   test("description mentions ABACATE_PAY_API_KEY", () => {
-    const d = (apiKeyParam() as any)._def.description as string;
+    const d = apiKeyParam().description as string;
     expect(d).toContain("ABACATE_PAY_API_KEY");
   });
   test("is optional", () => {
-    expect((apiKeyParam() as any)._def.typeName).toBe("ZodOptional");
+    expect((apiKeyParam() as any)._def.type).toBe("optional");
   });
 });

@@ -16,7 +16,7 @@ export function registerCouponTools(server: McpServer) {
       discount: z.number(),
       notes: z.string().optional(),
       maxRedeems: z.number().optional().describe("-1 para ilimitado. Padrão: -1 se omitido."),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;

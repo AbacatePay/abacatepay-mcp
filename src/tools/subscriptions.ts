@@ -45,7 +45,7 @@ export function registerSubscriptionTools(server: McpServer) {
       retryPolicy: retryPolicy
         .optional()
         .describe("Política de novas tentativas em caso de falha de cobrança."),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;
