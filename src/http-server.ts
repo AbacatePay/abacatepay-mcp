@@ -14,14 +14,18 @@ import { oauthRouter } from "./oauth/routes.js";
 import { registerAllTools } from "./tools/index.js";
 
 function createServer(): McpServer {
-  const server = new McpServer({
-    name: "abacatepay-mcp",
-    version: "2.0.0",
-    capabilities: {
-      resources: {},
-      tools: {},
+  const server = new McpServer(
+    {
+      name: "abacatepay-mcp",
+      version: "2.0.0",
     },
-  });
+    {
+      capabilities: {
+        resources: {},
+        tools: {},
+      },
+    },
+  );
 
   registerAllTools(server);
 

@@ -42,7 +42,7 @@ export function registerPaymentLinkTools(server: McpServer) {
       interest: feeValue.optional(),
       fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
       dueDate: z.string().optional().describe("YYYY-MM-DD"),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;

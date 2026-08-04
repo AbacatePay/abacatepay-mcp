@@ -14,7 +14,7 @@ export function registerCustomerTools(server: McpServer) {
       cellphone: z.string().optional(),
       taxId: z.string().optional(),
       zipCode: z.string().optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const { apiKey, email, name, cellphone, taxId, zipCode, metadata } = params as any;

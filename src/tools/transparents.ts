@@ -58,7 +58,7 @@ export function registerTransparentTools(server: McpServer) {
       description: z.string().max(140).optional(),
       customer: pixCustomer.optional(),
       utm: utm.optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;
@@ -108,7 +108,7 @@ export function registerTransparentTools(server: McpServer) {
       interest: feeValue.optional(),
       fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
       utm: utm.optional(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;
@@ -204,7 +204,7 @@ export function registerTransparentTools(server: McpServer) {
     {
       apiKey: apiKeyParam(),
       id: z.string(),
-      metadata: z.record(z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;
