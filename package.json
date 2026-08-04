@@ -73,7 +73,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-security": "^4.0.1",
     "inquirer": "^14.0.2",
-    "typescript": "^7.0.2"
+    "typescript": "^6.0.3"
   },
   "engines": {
     "bun": ">=1.0.0"
