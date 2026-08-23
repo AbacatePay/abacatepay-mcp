@@ -10,6 +10,8 @@ const subItem = z
   })
   .strict();
 
+const feeValue = z.object({ value: z.number().min(0) }).strict();
+
 const retryPolicy = z
   .object({
     maxRetry: z.number().int().min(1).max(10).default(3),
@@ -42,6 +44,11 @@ export function registerSubscriptionTools(server: McpServer) {
       customerId: z.string().optional(),
       coupons: z.array(z.string()).max(50).optional(),
       externalId: z.string().optional(),
+      upSellProductId: z.string().optional(),
+      card: z.object({ maxInstallments: z.number().int().min(1).max(12) }).strict().optional(),
+      interest: feeValue.optional(),
+      fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
+      dueDate: z.string().optional().describe("YYYY-MM-DD"),
       retryPolicy: retryPolicy
         .optional()
         .describe("Política de novas tentativas em caso de falha de cobrança."),
@@ -57,6 +64,11 @@ export function registerSubscriptionTools(server: McpServer) {
         if (p.customerId) body.customerId = p.customerId;
         if (p.coupons?.length) body.coupons = p.coupons;
         if (p.externalId) body.externalId = p.externalId;
+        if (p.upSellProductId) body.upSellProductId = p.upSellProductId;
+        if (p.card) body.card = p.card;
+        if (p.interest) body.interest = p.interest;
+        if (p.fine) body.fine = p.fine;
+        if (p.dueDate) body.dueDate = p.dueDate;
         if (p.retryPolicy) body.retryPolicy = p.retryPolicy;
         if (p.metadata) body.metadata = p.metadata;
 
@@ -79,13 +91,15 @@ export function registerSubscriptionTools(server: McpServer) {
 
   server.tool(
     "listSubscriptions",
-    "Lista assinaturas. Observação: apenas o filtro `status` é de fato aplicado pela API hoje; `before`/`after`/`limit` controlam a paginação.",
+    "Lista assinaturas. Observação: a API aplica apenas `status` e o intervalo `startDate`/`endDate`; `before`/`after`/`limit` controlam a paginação.",
     {
       apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       status: subscriptionStatus.optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -96,6 +110,8 @@ export function registerSubscriptionTools(server: McpServer) {
             before: p.before,
             limit: p.limit,
             status: p.status,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

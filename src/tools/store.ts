@@ -36,6 +36,8 @@ export function registerStoreTools(server: McpServer) {
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
       name: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -47,6 +49,8 @@ export function registerStoreTools(server: McpServer) {
             limit: p.limit,
             id: p.id,
             name: p.name,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

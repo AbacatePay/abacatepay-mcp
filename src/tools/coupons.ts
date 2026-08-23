@@ -16,7 +16,8 @@ export function registerCouponTools(server: McpServer) {
       discount: z.number(),
       notes: z.string().optional(),
       maxRedeems: z.number().optional().describe("-1 para ilimitado. Padrão: -1 se omitido."),
-      metadata: z.record(z.string(), z.unknown()).optional(),
+      startsAt: z.string().optional().describe("Início da validade (ISO). Precisa ser posterior a hoje."),
+      expiresAt: z.string().optional().describe("Fim da validade (ISO). Precisa ser posterior a hoje e a startsAt."),
     },
     async (params, extra) => {
       const p = params as any;
@@ -29,7 +30,8 @@ export function registerCouponTools(server: McpServer) {
           maxRedeems: p.maxRedeems ?? -1,
         };
         if (p.notes != null) body.notes = p.notes;
-        if (p.metadata) body.metadata = p.metadata;
+        if (p.startsAt) body.startsAt = p.startsAt;
+        if (p.expiresAt) body.expiresAt = p.expiresAt;
 
         const res = await makeAbacatePayRequest<any>({
           path: "/coupons/create",
@@ -58,6 +60,8 @@ export function registerCouponTools(server: McpServer) {
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
       status: couponStatus.optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -69,6 +73,8 @@ export function registerCouponTools(server: McpServer) {
             limit: p.limit,
             id: p.id,
             status: p.status,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

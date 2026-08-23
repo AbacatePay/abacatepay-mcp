@@ -59,6 +59,10 @@ export function registerCustomerTools(server: McpServer) {
       id: z.string().optional(),
       email: z.string().optional(),
       taxId: z.string().optional(),
+      name: z.string().optional(),
+      cellphone: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -71,6 +75,10 @@ export function registerCustomerTools(server: McpServer) {
             id: p.id,
             email: p.email,
             taxId: p.taxId,
+            name: p.name,
+            cellphone: p.cellphone,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

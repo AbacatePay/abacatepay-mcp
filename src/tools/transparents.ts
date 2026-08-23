@@ -235,6 +235,8 @@ export function registerTransparentTools(server: McpServer) {
       externalId: z.string().optional(),
       method: z.enum(["PIX", "CARD", "PIX_QRCODE", "BOLETO"]).optional(),
       status: transparentStatus.optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -248,6 +250,8 @@ export function registerTransparentTools(server: McpServer) {
             externalId: p.externalId,
             method: p.method,
             status: p.status,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
