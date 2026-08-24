@@ -70,6 +70,8 @@ export function registerWebhookTools(server: McpServer) {
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
       id: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -81,6 +83,8 @@ export function registerWebhookTools(server: McpServer) {
             after: p.after,
             before: p.before,
             id: p.id,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,

@@ -75,6 +75,8 @@ export function registerProductTools(server: McpServer) {
       name: z.string().optional(),
       status: z.string().optional(),
       currency: z.string().optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
     async (params, extra) => {
       const p = params as any;
@@ -90,6 +92,8 @@ export function registerProductTools(server: McpServer) {
             name: p.name,
             status: p.status,
             currency: p.currency,
+            startDate: p.startDate,
+            endDate: p.endDate,
           })}`,
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
