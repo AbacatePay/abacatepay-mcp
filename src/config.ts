@@ -36,6 +36,9 @@ if (isMainModule && !isHttpServerEntry && !process.env.NODE_ENV?.includes('test'
   }
 }
 
-export const ABACATE_PAY_API_BASE = "https://api.abacatepay.com/v2";
+// Sobrescrevível para apontar o servidor a uma API local (ex.: http://localhost:3333/v2)
+// e validar ferramentas novas antes do deploy. Sem a variável, produção.
+export const ABACATE_PAY_API_BASE =
+  process.env.ABACATE_PAY_API_BASE ?? "https://api.abacatepay.com/v2";
 
 export const USER_AGENT = "abacatepay-mcp/2.0";

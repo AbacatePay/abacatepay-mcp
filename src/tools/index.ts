@@ -6,6 +6,7 @@ import { registerPaymentLinkTools } from "./payment-links.js";
 import { registerPayoutTools } from "./payouts.js";
 import { registerPixSendTools } from "./pix-send.js";
 import { registerProductTools } from "./products.js";
+import { registerReportTools } from "./reports.js";
 import { registerStoreTools } from "./store.js";
 import { registerSubscriptionTools } from "./subscriptions.js";
 import { registerTransparentTools } from "./transparents.js";
@@ -24,4 +25,5 @@ export function registerAllTools(server: McpServer) {
   registerSubscriptionTools(server);
   registerStoreTools(server);
   registerWebhookTools(server);
+  registerReportTools(server);
 }
