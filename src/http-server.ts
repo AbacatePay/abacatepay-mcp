@@ -32,6 +32,19 @@ function createServer(): McpServer {
   return server;
 }
 
+/**
+ * Sessions live in memory, so every deploy/restart drops them. The spec says an
+ * unknown session ID gets 404, which makes the client start a new session; a 400
+ * leaves it stuck until the user reconnects.
+ */
+function unknownSession(res: Response): void {
+  res.status(404).json({
+    jsonrpc: "2.0",
+    error: { code: -32001, message: "Session not found" },
+    id: null,
+  });
+}
+
 async function main() {
   try {
     const app = express();
@@ -59,13 +72,14 @@ async function main() {
       const sessionId =
         typeof sessionIdHeader === "string" ? sessionIdHeader : undefined;
 
-      if (sessionId) {
-        setSessionApiKey(sessionId, validatedApiKey);
-      }
-
       let transport: StreamableHTTPServerTransport | undefined;
       if (sessionId) {
         transport = transports.get(sessionId);
+        if (!transport) {
+          unknownSession(res);
+          return;
+        }
+        setSessionApiKey(sessionId, validatedApiKey);
       }
 
       const body = (req as Request & { body?: unknown }).body;
@@ -121,13 +135,12 @@ async function main() {
         return;
       }
 
-      setSessionApiKey(sessionId, validatedApiKey);
-
       const transport = transports.get(sessionId);
       if (!transport) {
-        res.status(400).send("Invalid or missing session ID");
+        unknownSession(res);
         return;
       }
+      setSessionApiKey(sessionId, validatedApiKey);
       await transport.handleRequest(req, res);
     };
 
