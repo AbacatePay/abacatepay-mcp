@@ -42,3 +42,8 @@ export const ABACATE_PAY_API_BASE =
   process.env.ABACATE_PAY_API_BASE ?? "https://api.abacatepay.com/v2";
 
 export const USER_AGENT = "abacatepay-mcp/2.0";
+
+// Endereço público do servidor HTTP. É dele que saem o issuer e as URLs dos
+// /.well-known — nunca dos headers da requisição. Localmente:
+// MCP_PUBLIC_URL=http://localhost:3000.
+export const PUBLIC_BASE_URL = (process.env.MCP_PUBLIC_URL ?? "https://mcp.abacatepay.com").replace(/\/$/, "");

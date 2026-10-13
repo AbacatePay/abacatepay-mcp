@@ -77,9 +77,11 @@ Exemplo de configuração remota (Cursor, com header direto):
 ### Local, servindo HTTP (para testar OAuth ou o modo multi-tenant)
 
 ```bash
-bun run src/http-server.ts
+MCP_PUBLIC_URL=http://localhost:3000 bun run src/http-server.ts
 # porta padrão 3000; ajuste com MCP_PORT ou PORT
 ```
+
+`MCP_PUBLIC_URL` é o endereço público do servidor: dele saem o `issuer` e as URLs dos `/.well-known`, que nunca são montados a partir dos headers da requisição. Sem a variável, `https://mcp.abacatepay.com`.
 
 ---
 
@@ -91,10 +93,11 @@ Fluxo, do ponto de vista do Claude/cliente MCP:
 
 1. O cliente descobre os metadados em `/.well-known/oauth-protected-resource` e `/.well-known/oauth-authorization-server`.
 2. Registra-se dinamicamente em `POST /register` (RFC 7591).
-3. Abre `GET /authorize` no navegador do usuário — uma página simples pede a **chave de API v2** da Abacate Pay (não uma senha de conta).
-4. Após validar a chave contra a API (`GET /v2/stores/get`), o servidor emite um código de autorização e redireciona de volta ao cliente.
-5. O cliente troca o código por um token em `POST /token` (com verificação PKCE). O "token" retornado é, na prática, a própria chave de API v2, guardada de forma criptografada (AES-256-GCM) no SQLite do servidor até esse ponto.
-6. O cliente usa esse token como `Authorization: Bearer` normalmente em `/mcp`.
+   Os `redirect_uris` precisam ser `https`, `http` em loopback (`localhost`, `127.0.0.1`, `[::1]`) ou esquema de app nativo (`cursor://`, `vscode://`).
+3. Abre `GET /authorize` no navegador do usuário — uma página simples mostra o nome do aplicativo e para onde o acesso vai, e pede a **chave de API v2** da Abacate Pay (não uma senha de conta). O formulário é protegido por token CSRF em cookie `SameSite=Strict`.
+4. Após validar a chave contra a API (`GET /v2/stores/get`, só `200` conta como válida), o servidor emite um código de autorização e redireciona de volta ao cliente.
+5. O cliente troca o código por um token em `POST /token` (com verificação PKCE). O token (`mcp_at_…`) é opaco: a chave de API fica criptografada (AES-256-GCM) no SQLite do servidor, e só o hash do token é guardado. `POST /revoke` invalida o token; revogar a chave no painel também.
+6. O cliente usa esse token como `Authorization: Bearer` normalmente em `/mcp`. A chave de API direto no header continua aceita.
 
 Não há conta de usuário nem senha do Abacate Pay envolvida — apenas a chave de API do lojista, o mesmo modelo de autenticação usado no header direto.
 

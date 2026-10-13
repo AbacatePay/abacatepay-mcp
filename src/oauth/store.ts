@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { decrypt, encrypt, loadEncryptionKey } from "./crypto.js";
@@ -28,6 +28,16 @@ db.run(`
     secret_enc    TEXT NOT NULL,
     redirect_uris TEXT NOT NULL,
     client_name   TEXT
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS oauth_tokens (
+    token_hash  TEXT PRIMARY KEY,
+    client_id   TEXT NOT NULL,
+    api_key_enc TEXT NOT NULL,
+    scope       TEXT,
+    created_at  INTEGER NOT NULL
   )
 `);
 
@@ -75,7 +85,7 @@ const stmts = {
     "INSERT INTO oauth_clients (client_id, secret_enc, redirect_uris, client_name) VALUES ($id, $secretEnc, $uris, $name)"
   ),
   selectClient: db.prepare(
-    "SELECT client_id, secret_enc, redirect_uris, client_name FROM oauth_clients WHERE client_id = $id"
+    "SELECT client_id, redirect_uris, client_name FROM oauth_clients WHERE client_id = $id"
   ),
   insertCode: db.prepare(
     `INSERT INTO oauth_codes
@@ -90,6 +100,12 @@ const stmts = {
   ),
   deleteCode: db.prepare("DELETE FROM oauth_codes WHERE code = $code"),
   deleteExpiredCodes: db.prepare("DELETE FROM oauth_codes WHERE expires_at < $now"),
+  insertToken: db.prepare(
+    `INSERT INTO oauth_tokens (token_hash, client_id, api_key_enc, scope, created_at)
+     VALUES ($hash, $clientId, $apiKeyEnc, $scope, $createdAt)`
+  ),
+  selectToken: db.prepare("SELECT api_key_enc FROM oauth_tokens WHERE token_hash = $hash"),
+  deleteToken: db.prepare("DELETE FROM oauth_tokens WHERE token_hash = $hash"),
 };
 
 // ---------------------------------------------------------------------------
@@ -98,7 +114,6 @@ const stmts = {
 
 export interface OAuthClient {
   clientId: string;
-  clientSecret: string;
   redirectUris: string[];
   clientName?: string;
 }
@@ -123,39 +138,31 @@ export function registerClient(
   redirectUris: string[],
   clientName?: string
 ): OAuthClient {
+  // Public clients (token_endpoint_auth_method "none") — no secret is issued.
+  // The column stays for rows registered before that.
   const clientId = randomUUID();
-  const clientSecret = randomUUID();
 
   stmts.insertClient.run({
     $id: clientId,
-    $secretEnc: encrypt(clientSecret, encKey),
+    $secretEnc: "",
     $uris: JSON.stringify(redirectUris),
     $name: clientName ?? null,
   });
 
-  return { clientId, clientSecret, redirectUris, clientName };
+  return { clientId, redirectUris, clientName };
 }
 
 export function getClient(clientId: string): OAuthClient | undefined {
   const row = stmts.selectClient.get({ $id: clientId }) as {
     client_id: string;
-    secret_enc: string;
     redirect_uris: string;
     client_name: string | null;
   } | null;
 
   if (!row) return undefined;
 
-  let clientSecret: string;
-  try {
-    clientSecret = decrypt(row.secret_enc, encKey);
-  } catch {
-    return undefined;
-  }
-
   return {
     clientId: row.client_id,
-    clientSecret,
     redirectUris: JSON.parse(row.redirect_uris) as string[],
     clientName: row.client_name ?? undefined,
   };
@@ -231,4 +238,49 @@ export function consumeAuthCode(code: string): AuthCode | undefined {
     scope: row.scope ?? undefined,
     resource: row.resource ?? undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Access tokens
+//
+// The token handed to the MCP client is opaque; the API key stays here,
+// encrypted, and is looked up on each /mcp request. Only the token's hash is
+// stored. Revoking the API key in the dashboard also kills the token, since
+// every call made with it goes through the API.
+// ---------------------------------------------------------------------------
+
+export const ACCESS_TOKEN_PREFIX = "mcp_at_";
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function issueAccessToken(clientId: string, apiKey: string, scope?: string): string {
+  const token = ACCESS_TOKEN_PREFIX + randomBytes(32).toString("base64url");
+
+  stmts.insertToken.run({
+    $hash: hashToken(token),
+    $clientId: clientId,
+    $apiKeyEnc: encrypt(apiKey, encKey),
+    $scope: scope ?? null,
+    $createdAt: Date.now(),
+  });
+
+  return token;
+}
+
+/** The API key behind an access token, or undefined if unknown, revoked or unreadable. */
+export function resolveAccessToken(token: string): string | undefined {
+  const row = stmts.selectToken.get({ $hash: hashToken(token) }) as { api_key_enc: string } | null;
+  if (!row) return undefined;
+
+  try {
+    return decrypt(row.api_key_enc, encKey);
+  } catch {
+    return undefined;
+  }
+}
+
+export function revokeAccessToken(token: string): void {
+  stmts.deleteToken.run({ $hash: hashToken(token) });
 }
