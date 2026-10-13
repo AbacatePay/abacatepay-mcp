@@ -26,7 +26,9 @@ jobs:
     - name: 🔍 Auditoria de segurança
       run: |
         echo "🔍 Verificando vulnerabilidades de segurança..."
-        bun audit
+        # Ignorados: sem versão corrigida publicada, e só entram via @changesets/cli (dev):
+        # braces (GHSA-vfj7-8cjw-p6xm), sprintf-js (GHSA-hp3w-g68c-fv3c), js-yaml 3.x (GHSA-2883-xcg3-v3hh)
+        bun audit --ignore=GHSA-vfj7-8cjw-p6xm --ignore=GHSA-hp3w-g68c-fv3c --ignore=GHSA-2883-xcg3-v3hh
         if [ $? -ne 0 ]; then
           echo "❌ Vulnerabilidades de alta severidade encontradas!"
           echo "💡 Execute 'bun audit' para verificar detalhes"
