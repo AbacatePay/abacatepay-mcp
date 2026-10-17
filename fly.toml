@@ -22,10 +22,20 @@ primary_region = 'gru'
   min_machines_running = 0
   processes = ['app']
 
+  # O deploy só segue se o servidor responder; o proxy também para de mandar tráfego pra máquina
+  # que não responde. Não reinicia a máquina sozinho — quem evita o travamento é a expiração das
+  # sessões (src/http/sessions.ts).
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
 [[vm]]
-  memory = '512mb'
+  memory = '1gb'
   cpus = 1
-  memory_mb = 512
+  memory_mb = 1024
 
 # Persistent volume for the OAuth SQLite DB and encryption key file.
 # Create once before first deploy:
