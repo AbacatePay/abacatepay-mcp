@@ -1,5 +1,5 @@
 # Versão fixa: a tag "1" virou Bun 1.4 em 10/10/2026 e entrou em produção sem ninguém mudar nada aqui
-FROM oven/bun:1.4.3-alpine
+FROM oven/bun:1.4.4-alpine
 
 # Set resource constraints
 ENV NODE_OPTIONS="--max-old-space-size=500"
