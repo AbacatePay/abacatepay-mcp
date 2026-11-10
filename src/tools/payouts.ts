@@ -13,7 +13,7 @@ const pixDest = z
 export function registerPayoutTools(server: McpServer) {
   server.tool(
     "createPayout",
-    "Saca saldo da conta Abacate Pay para uma chave PIX da própria loja: a chave tem que estar no mesmo CNPJ da loja (chave no CPF de um sócio é recusada). Para pagar um terceiro, use sendPix. Este endpoint não deduplica por externalId: depois de um timeout, consulte getPayout com o externalId antes de tentar de novo.",
+    "Saca saldo da conta Abacate Pay para uma chave PIX da própria loja: a chave tem que estar no mesmo CNPJ da loja (chave no CPF de um sócio é recusada). Para pagar um terceiro, use sendPix. Repetir o mesmo externalId com o mesmo valor devolve o envio que já existe, em qualquer status, em vez de sacar de novo: depois de um timeout, chame de novo com o mesmo externalId. Com outro valor dá erro. Se o envio voltou FAILED, tente de novo com outro externalId. Sem externalId não há essa proteção; um externalId já usado num saque de subconta é recusado.",
     {
       apiKey: apiKeyParam(),
       amount: z.number().int().min(1).describe("Valor em centavos."),
@@ -21,7 +21,7 @@ export function registerPayoutTools(server: McpServer) {
       externalId: z
         .string()
         .optional()
-        .describe("Seu identificador do saque; mande sempre, para conseguir consultar com getPayout se a resposta não chegar."),
+        .describe("Seu identificador do saque. Mande sempre: é ele que evita saque em dobro quando a chamada é repetida."),
       description: z.string().optional(),
     },
     async (params, extra) => {

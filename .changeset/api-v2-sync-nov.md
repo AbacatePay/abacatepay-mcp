@@ -34,5 +34,5 @@ Alinha as tools com a API v2 de novembro e cobre as rotas que faltavam.
 
 **Descrições**
 
-- `sendPix` diz que a chave não pode ser da própria loja e que repetir o `externalId` devolve o envio já feito.
-- `createPayout` diz que a chave tem que estar no CNPJ da loja e que repetir o `externalId` não é deduplicado.
+- `sendPix` diz que a chave não pode ser da própria loja, e `createPayout`, que a chave tem que estar no CNPJ da loja.
+- `sendPix`, `createPayout` e `withdrawSubAccount` dizem o que acontece ao repetir o `externalId`. Com o mesmo valor, volta o envio que já existe, em qualquer status. Com outro valor, ou com um `externalId` já usado por outro saldo (loja × subconta), dá erro.

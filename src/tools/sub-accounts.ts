@@ -114,12 +114,12 @@ export function registerSubAccountTools(server: McpServer) {
 
   server.tool(
     "withdrawSubAccount",
-    "Saca o saldo de uma subconta por PIX. O dinheiro vai sempre para a chave CPF/CNPJ do titular da subconta; não dá para escolher outra chave. Este endpoint não deduplica por externalId: depois de um timeout, consulte getPayout com o mesmo externalId antes de tentar de novo.",
+    "Saca o saldo de uma subconta por PIX. O dinheiro vai sempre para a chave CPF/CNPJ do titular da subconta; não dá para escolher outra chave. Repetir o mesmo externalId com o mesmo valor devolve o envio que já existe, em qualquer status, em vez de sacar de novo: depois de um timeout, chame de novo com o mesmo externalId. Com outro valor dá erro. Se o envio voltou FAILED, tente de novo com outro externalId. Um externalId já usado num saque da loja ou de outra subconta é recusado.",
     {
       apiKey: apiKeyParam(),
       id: z.string().regex(/^sacc_/).describe("ID da subconta (sacc_...)."),
       amount: z.number().int().min(100).describe("Valor em centavos, mínimo 100."),
-      externalId: z.string().min(1).max(100).describe("Seu identificador do saque."),
+      externalId: z.string().min(1).max(100).describe("Seu identificador do saque; é ele que evita saque em dobro quando a chamada é repetida."),
       description: z.string().max(140).optional(),
     },
     async (params, extra) => {

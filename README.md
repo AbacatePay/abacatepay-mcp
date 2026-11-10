@@ -142,7 +142,7 @@ Implementação: um arquivo por recurso em `src/tools/` (ex.: `src/tools/checkou
 - `listPixTransactions`/`getPixTransaction` exigem `id`; a API não pagina nem filtra por status nesse endpoint.
 - `changeSubscriptionPlan` e `cancelSubscription` são irreversíveis; não há suporte a pró-rata no cancelamento.
 - `createSubscription` devolve um **checkout de assinatura** (`bill_...`). A assinatura (`subs_...`) só nasce quando um cliente paga, uma por cliente pagante: use `getSubscriptionCheckout` para o checkout e `listSubscriptions` com `checkoutId` para as assinaturas.
-- `sendPix` paga a chave de um terceiro e repetir o `externalId` devolve o envio já feito. `createPayout` e `withdrawSubAccount` não deduplicam por `externalId`: depois de um timeout, consulte `getPayout` antes de tentar de novo.
+- `sendPix` paga a chave de um terceiro; `createPayout` saca para a chave da própria loja. Em `sendPix`, `createPayout` e `withdrawSubAccount`, repetir o `externalId` com o mesmo valor devolve o envio que já existe (em qualquer status) em vez de mandar outro PIX; com outro valor, ou com um `externalId` já usado por um envio de outro saldo (loja × subconta), dá erro. Depois de um `FAILED`, use outro `externalId`.
 - Subcontas e split precisam ser habilitados pelo suporte. O saque de subconta vai sempre para a chave CPF/CNPJ do titular.
 
 ## Ideias de prompts
