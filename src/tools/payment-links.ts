@@ -1,7 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
-import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
+import {
+  apiKeyParam,
+  buildQuery,
+  cardOptions,
+  checkoutMethodFilter,
+  checkoutStatus,
+  paginationHint,
+  toolError,
+} from "./shared.js";
 
 const linkItem = z
   .object({
@@ -12,36 +20,32 @@ const linkItem = z
 
 const feeValue = z.object({ value: z.number().min(0) }).strict();
 
-const checkoutStatus = z.enum([
-  "PENDING",
-  "EXPIRED",
-  "CANCELLED",
-  "PAID",
-  "UNDER_DISPUTE",
-  "REFUNDED",
-  "REDEEMED",
-  "APPROVED",
-  "FAILED",
-]);
 
 export function registerPaymentLinkTools(server: McpServer) {
   server.tool(
     "createPaymentLink",
-    "Cria link de pagamento reutilizável (MULTIPLE_PAYMENTS) com itens de produto já cadastrados.",
+    "Cria link de pagamento reutilizável (MULTIPLE_PAYMENTS) com itens de produto já cadastrados. Não aceita customerId: cada pagamento identifica o próprio cliente.",
     {
       apiKey: apiKeyParam(),
       items: z.array(linkItem).min(1),
-      methods: z.array(z.enum(["PIX", "CARD", "BOLETO"])).min(1).optional().describe("Padrão: PIX e CARD."),
-      card: z.object({ maxInstallments: z.number().int().min(1).max(12) }).strict().optional(),
+      methods: z
+        .array(z.enum(["PIX", "CARD", "BOLETO"]))
+        .min(1)
+        .optional()
+        .describe("Padrão: PIX e CARD. Apple Pay e Google Pay só existem no checkout de pagamento único."),
+      card: cardOptions.optional(),
       returnUrl: z.string().url().optional(),
       completionUrl: z.string().url().optional(),
-      customerId: z.string().optional(),
       coupons: z.array(z.string()).max(50).optional(),
       externalId: z.string().optional(),
       upSellProductId: z.string().optional(),
-      interest: feeValue.optional(),
-      fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
-      dueDate: z.string().optional().describe("YYYY-MM-DD"),
+      interest: feeValue.optional().describe("Juros do boleto; exige BOLETO em methods."),
+      fine: z
+        .object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) })
+        .strict()
+        .optional()
+        .describe("Multa do boleto; exige BOLETO em methods."),
+      dueDate: z.string().optional().describe("Vencimento do boleto (YYYY-MM-DD); exige BOLETO em methods."),
       metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
@@ -52,7 +56,6 @@ export function registerPaymentLinkTools(server: McpServer) {
         if (p.card) body.card = p.card;
         if (p.returnUrl) body.returnUrl = p.returnUrl;
         if (p.completionUrl) body.completionUrl = p.completionUrl;
-        if (p.customerId) body.customerId = p.customerId;
         if (p.coupons?.length) body.coupons = p.coupons;
         if (p.externalId) body.externalId = p.externalId;
         if (p.upSellProductId) body.upSellProductId = p.upSellProductId;
@@ -91,7 +94,7 @@ export function registerPaymentLinkTools(server: McpServer) {
       status: checkoutStatus.optional(),
       customerId: z.string().optional(),
       externalId: z.string().optional(),
-      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
+      method: checkoutMethodFilter.optional(),
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
@@ -133,7 +136,7 @@ export function registerPaymentLinkTools(server: McpServer) {
       id: z.string().optional(),
       externalId: z.string().optional(),
       customerId: z.string().optional(),
-      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
+      method: checkoutMethodFilter.optional(),
     },
     async (params, extra) => {
       const p = params as any;

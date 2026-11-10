@@ -13,11 +13,13 @@ const pixDest = z
 export function registerPixSendTools(server: McpServer) {
   server.tool(
     "sendPix",
-    "Envia PIX para chave de terceiros (destino não precisa pertencer à sua loja).",
+    "Envia PIX para a chave de um terceiro (fornecedor, parceiro). A chave não pode ser da própria loja: para sacar para a sua conta, use createPayout. Repetir o mesmo externalId com o mesmo valor devolve o envio que já existe, em qualquer status, em vez de mandar outro PIX: depois de um timeout, chame de novo com o mesmo externalId. Com outro valor dá erro. Se o envio voltou FAILED, tente de novo com outro externalId. Um externalId já usado num saque de subconta é recusado.",
     {
       apiKey: apiKeyParam(),
-      externalId: z.string().describe("Obrigatório: identificador único no seu sistema."),
-      amount: z.number().min(100).describe("Valor em centavos, mínimo 100."),
+      externalId: z
+        .string()
+        .describe("Obrigatório: identificador único no seu sistema; é ele que evita envio em dobro."),
+      amount: z.number().int().min(100).describe("Valor em centavos, mínimo 100."),
       pix: pixDest,
       description: z.string().optional(),
     },

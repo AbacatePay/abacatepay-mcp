@@ -95,7 +95,7 @@ export function registerCouponTools(server: McpServer) {
     "Busca cupom por id.",
     {
       apiKey: apiKeyParam(),
-      id: z.string().optional(),
+      id: z.string().describe("ID do cupom."),
       status: couponStatus.optional(),
     },
     async (params, extra) => {

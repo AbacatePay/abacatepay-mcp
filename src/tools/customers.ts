@@ -1,7 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
-import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
+import { apiKeyParam, buildQuery, metadataStrings, paginationHint, toolError } from "./shared.js";
+
+const address = z
+  .object({
+    zipCode: z.string(),
+    street: z.string(),
+    number: z.string(),
+    neighborhood: z.string(),
+    city: z.string(),
+    state: z.string().length(2).describe("UF com 2 letras."),
+    complement: z.string().optional(),
+  })
+  .strict();
 
 export function registerCustomerTools(server: McpServer) {
   server.tool(
@@ -14,16 +26,18 @@ export function registerCustomerTools(server: McpServer) {
       cellphone: z.string().optional(),
       taxId: z.string().optional(),
       zipCode: z.string().optional(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
+      address: address.optional().describe("Endereço completo do cliente."),
+      metadata: metadataStrings.optional(),
     },
     async (params, extra) => {
-      const { apiKey, email, name, cellphone, taxId, zipCode, metadata } = params as any;
+      const { apiKey, email, name, cellphone, taxId, zipCode, address, metadata } = params as any;
       try {
         const body: Record<string, unknown> = { email };
         if (name) body.name = name;
         if (cellphone) body.cellphone = cellphone;
         if (taxId) body.taxId = taxId;
         if (zipCode) body.zipCode = zipCode;
+        if (address) body.address = address;
         if (metadata) body.metadata = metadata;
 
         const res = await makeAbacatePayRequest<any>({

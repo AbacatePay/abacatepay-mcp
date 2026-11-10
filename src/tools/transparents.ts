@@ -19,6 +19,26 @@ const boletoCustomer = z
     email: z.string().email().optional(),
     cellphone: z.string().optional(),
     zipCode: z.string().optional(),
+    address: z
+      .object({
+        zipCode: z.string(),
+        street: z.string(),
+        number: z.string(),
+        neighborhood: z.string(),
+        city: z.string(),
+        state: z.string().length(2).describe("UF com 2 letras."),
+        complement: z.string().optional(),
+      })
+      .strict()
+      .optional()
+      .describe("Endereço de quem paga o boleto."),
+  })
+  .strict();
+
+const pixSplit = z
+  .object({
+    subAccountId: z.string().regex(/^sacc_/).describe("Subconta que recebe esta parte (sacc_...)."),
+    amount: z.number().int().min(1).describe("Centavos que vão para a subconta."),
   })
   .strict();
 
@@ -29,6 +49,8 @@ const utm = z
     campaign: z.string().optional(),
     term: z.string().optional(),
     content: z.string().optional(),
+    src: z.string().optional(),
+    sck: z.string().optional(),
   })
   .strict();
 
@@ -57,6 +79,20 @@ export function registerTransparentTools(server: McpServer) {
       expiresIn: z.number().min(60).optional().describe("Segundos até expirar, mínimo 60."),
       description: z.string().max(140).optional(),
       customer: pixCustomer.optional(),
+      ensureSameTaxId: z
+        .boolean()
+        .optional()
+        .describe(
+          "Recusa o pagamento quando o CPF/CNPJ de quem paga for diferente de customer.taxId. Exige customer; só funciona com o PIX pela Woovi."
+        ),
+      splits: z
+        .array(pixSplit)
+        .min(1)
+        .max(10)
+        .optional()
+        .describe(
+          "Partes do valor creditadas em subcontas quando o PIX for pago. A soma tem que caber no valor menos a taxa. O split precisa ser habilitado pelo suporte."
+        ),
       utm: utm.optional(),
       metadata: z.record(z.string(), z.unknown()).optional(),
     },
@@ -68,6 +104,8 @@ export function registerTransparentTools(server: McpServer) {
         if (p.expiresIn != null) dataBody.expiresIn = p.expiresIn;
         if (p.description) dataBody.description = p.description;
         if (p.customer) dataBody.customer = p.customer;
+        if (p.ensureSameTaxId != null) dataBody.ensureSameTaxId = p.ensureSameTaxId;
+        if (p.splits?.length) dataBody.splits = p.splits;
         if (p.utm) dataBody.utm = p.utm;
         if (p.metadata) dataBody.metadata = p.metadata;
 
@@ -100,7 +138,7 @@ export function registerTransparentTools(server: McpServer) {
     "Cria boleto (checkout transparente, sem página hospedada). Dados do cliente são obrigatórios.",
     {
       apiKey: apiKeyParam(),
-      amount: z.number().int().min(100).describe("Valor em centavos, mínimo 100."),
+      amount: z.number().int().min(300).describe("Valor em centavos, mínimo 300 (R$ 3,00)."),
       customer: boletoCustomer,
       dueDate: z.string().optional().describe("YYYY-MM-DD"),
       description: z.string().max(500).optional(),
@@ -204,7 +242,6 @@ export function registerTransparentTools(server: McpServer) {
     {
       apiKey: apiKeyParam(),
       id: z.string(),
-      metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
       const p = params as any;
@@ -214,7 +251,7 @@ export function registerTransparentTools(server: McpServer) {
           apiKey: p.apiKey,
           sessionId: extra.sessionId,
           method: "POST",
-          body: JSON.stringify({ metadata: p.metadata ?? {} }),
+          body: "{}",
         });
         return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
       } catch (e) {

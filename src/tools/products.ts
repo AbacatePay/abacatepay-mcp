@@ -16,8 +16,7 @@ export function registerProductTools(server: McpServer) {
       price: z.number().int().min(1).describe("Preço em centavos."),
       currency: z.enum(["BRL"]).default("BRL"),
       description: z.string().optional(),
-      image: z.string().url().optional().describe("URL de imagem remota; será baixada e re-hospedada (máx. 5MB)."),
-      imageUrl: z.string().url().optional(),
+      imageUrl: z.string().url().optional().describe("URL de imagem remota; a API baixa e hospeda a imagem (máx. 5MB)."),
       fileUrl: z
         .string()
         .url()
@@ -38,7 +37,6 @@ export function registerProductTools(server: McpServer) {
           currency: p.currency ?? "BRL",
         };
         if (p.description != null) body.description = p.description;
-        if (p.image) body.image = p.image;
         if (p.imageUrl) body.imageUrl = p.imageUrl;
         if (p.fileUrl) body.fileUrl = p.fileUrl;
         if (p.cycle) body.cycle = p.cycle;
