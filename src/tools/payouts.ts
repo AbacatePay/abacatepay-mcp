@@ -13,12 +13,15 @@ const pixDest = z
 export function registerPayoutTools(server: McpServer) {
   server.tool(
     "createPayout",
-    "Transfere saldo da conta Abacate Pay para uma chave PIX da própria loja (a chave de destino deve pertencer ao mesmo CPF/CNPJ da loja).",
+    "Saca saldo da conta Abacate Pay para uma chave PIX da própria loja: a chave tem que estar no mesmo CNPJ da loja (chave no CPF de um sócio é recusada). Para pagar um terceiro, use sendPix. Este endpoint não deduplica por externalId: depois de um timeout, consulte getPayout com o externalId antes de tentar de novo.",
     {
       apiKey: apiKeyParam(),
-      amount: z.number().min(1).describe("Valor em centavos."),
+      amount: z.number().int().min(1).describe("Valor em centavos."),
       pix: pixDest.describe("Chave PIX de destino (deve ser da própria loja)."),
-      externalId: z.string().optional(),
+      externalId: z
+        .string()
+        .optional()
+        .describe("Seu identificador do saque; mande sempre, para conseguir consultar com getPayout se a resposta não chegar."),
       description: z.string().optional(),
     },
     async (params, extra) => {

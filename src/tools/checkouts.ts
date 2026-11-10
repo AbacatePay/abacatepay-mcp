@@ -1,7 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
-import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
+import {
+  apiKeyParam,
+  buildQuery,
+  cardOptions,
+  checkoutMethodFilter,
+  checkoutStatus,
+  paginationHint,
+  toolError,
+} from "./shared.js";
 
 const checkoutItem = z
   .object({
@@ -12,17 +20,6 @@ const checkoutItem = z
 
 const feeValue = z.object({ value: z.number().min(0) }).strict();
 
-const checkoutStatus = z.enum([
-  "PENDING",
-  "EXPIRED",
-  "CANCELLED",
-  "PAID",
-  "UNDER_DISPUTE",
-  "REFUNDED",
-  "REDEEMED",
-  "APPROVED",
-  "FAILED",
-]);
 
 export function registerCheckoutTools(server: McpServer) {
   server.tool(
@@ -31,17 +28,25 @@ export function registerCheckoutTools(server: McpServer) {
     {
       apiKey: apiKeyParam(),
       items: z.array(checkoutItem).min(1),
-      methods: z.array(z.enum(["PIX", "CARD", "BOLETO"])).min(1).optional().describe("Padrão: PIX e CARD."),
-      card: z.object({ maxInstallments: z.number().int().min(1).max(12) }).strict().optional(),
+      methods: z
+        .array(z.enum(["PIX", "CARD", "BOLETO", "GOOGLE_PAY", "APPLE_PAY"]))
+        .min(1)
+        .optional()
+        .describe("Padrão: PIX e CARD. GOOGLE_PAY e APPLE_PAY exigem a loja com cartão pela Rinne."),
+      card: cardOptions.optional(),
       returnUrl: z.string().url().optional(),
       completionUrl: z.string().url().optional(),
       customerId: z.string().optional(),
       coupons: z.array(z.string()).max(50).optional(),
       externalId: z.string().optional(),
       upSellProductId: z.string().optional(),
-      interest: feeValue.optional(),
-      fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
-      dueDate: z.string().optional().describe("YYYY-MM-DD"),
+      interest: feeValue.optional().describe("Juros do boleto; exige BOLETO em methods."),
+      fine: z
+        .object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) })
+        .strict()
+        .optional()
+        .describe("Multa do boleto; exige BOLETO em methods."),
+      dueDate: z.string().optional().describe("Vencimento do boleto (YYYY-MM-DD); exige BOLETO em methods."),
       metadata: z.record(z.string(), z.unknown()).optional(),
     },
     async (params, extra) => {
@@ -96,7 +101,7 @@ export function registerCheckoutTools(server: McpServer) {
       status: checkoutStatus.optional(),
       customerId: z.string().optional(),
       externalId: z.string().optional(),
-      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
+      method: checkoutMethodFilter.optional(),
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
@@ -134,13 +139,13 @@ export function registerCheckoutTools(server: McpServer) {
 
   server.tool(
     "getCheckout",
-    "Obtém um checkout por id, externalId, customerId ou method.",
+    "Obtém um checkout de pagamento único por id, externalId, customerId ou method. Checkout de assinatura: use getSubscriptionCheckout.",
     {
       apiKey: apiKeyParam(),
       id: z.string().optional(),
       externalId: z.string().optional(),
       customerId: z.string().optional(),
-      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
+      method: checkoutMethodFilter.optional(),
     },
     async (params, extra) => {
       const p = params as any;

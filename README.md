@@ -126,7 +126,10 @@ Nomes exatos das tools são os registrados no código (`src/tools/`); a lista co
 | Checkout transparente (PIX/Boleto) | `createTransparentPix`, `createTransparentBoleto`, `getTransparent`, `checkTransparentPix`, `simulateTransparentPixPayment`, `listTransparent`, `refundTransparent` |
 | Payouts (saque para a própria chave Pix) | `createPayout`, `getPayout`, `listPayouts` |
 | Envio de Pix (para terceiros) | `sendPix`, `getPixTransaction`, `listPixTransactions` |
-| Assinaturas | `createSubscription`, `listSubscriptions`, `getSubscription`, `cancelSubscription`, `changeSubscriptionPlan`, `recordSubscriptionUsage` |
+| Assinaturas | `createSubscription`, `getSubscriptionCheckout`, `listSubscriptionCheckouts`, `deleteSubscriptionCheckout`, `listSubscriptions`, `getSubscription`, `cancelSubscription`, `changeSubscriptionPlan`, `recordSubscriptionUsage` |
+| Portal do cliente | `createCustomerPortal` |
+| Subcontas (split no PIX) | `createSubAccount`, `getSubAccount`, `listSubAccounts`, `withdrawSubAccount` |
+| Extrato | `listBankStatement` |
 | Loja | `getStore`, `listStores` |
 | Webhooks | `createWebhook`, `listWebhooks`, `getWebhook`, `deleteWebhook` |
 
@@ -138,6 +141,9 @@ Implementação: um arquivo por recurso em `src/tools/` (ex.: `src/tools/checkou
 - `simulateTransparentPixPayment` só funciona com uma chave de **teste** (modo dev).
 - `listPixTransactions`/`getPixTransaction` exigem `id`; a API não pagina nem filtra por status nesse endpoint.
 - `changeSubscriptionPlan` e `cancelSubscription` são irreversíveis; não há suporte a pró-rata no cancelamento.
+- `createSubscription` devolve um **checkout de assinatura** (`bill_...`). A assinatura (`subs_...`) só nasce quando um cliente paga, uma por cliente pagante: use `getSubscriptionCheckout` para o checkout e `listSubscriptions` com `checkoutId` para as assinaturas.
+- `sendPix` paga a chave de um terceiro e repetir o `externalId` devolve o envio já feito. `createPayout` e `withdrawSubAccount` não deduplicam por `externalId`: depois de um timeout, consulte `getPayout` antes de tentar de novo.
+- Subcontas e split precisam ser habilitados pelo suporte. O saque de subconta vai sempre para a chave CPF/CNPJ do titular.
 
 ## Ideias de prompts
 

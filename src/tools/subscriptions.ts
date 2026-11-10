@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { makeAbacatePayRequest } from "../http/api.js";
-import { apiKeyParam, buildQuery, paginationHint, toolError } from "./shared.js";
+import { apiKeyParam, buildQuery, checkoutStatus, paginationHint, toolError } from "./shared.js";
 
 const subItem = z
   .object({
@@ -10,8 +10,6 @@ const subItem = z
   })
   .strict();
 
-const feeValue = z.object({ value: z.number().min(0) }).strict();
-
 const retryPolicy = z
   .object({
     maxRetry: z.number().int().min(1).max(10).default(3),
@@ -19,36 +17,33 @@ const retryPolicy = z
   })
   .strict();
 
-const subscriptionStatus = z.enum([
-  "PENDING",
-  "EXPIRED",
-  "CANCELLED",
-  "PAID",
-  "UNDER_DISPUTE",
-  "REFUNDED",
-  "REDEEMED",
-  "APPROVED",
-  "FAILED",
-]);
+const subscriptionMethod = z.enum(["CARD", "PIX"]);
+
+function reais(cents: number | null | undefined): string {
+  return typeof cents === "number" ? `R$ ${(cents / 100).toFixed(2)}` : "—";
+}
 
 export function registerSubscriptionTools(server: McpServer) {
   server.tool(
     "createSubscription",
-    "Cria assinatura (checkout recorrente). Itens devem referenciar produtos com cycle definido.",
+    "Cria um checkout de assinatura (bill_...) com produtos que têm cycle. A assinatura (subs_...) só nasce quando um cliente paga esse checkout, uma por cliente pagante. Para ver o checkout use getSubscriptionCheckout; para achar as assinaturas geradas, listSubscriptions com checkoutId.",
     {
       apiKey: apiKeyParam(),
       items: z.array(subItem).min(1),
-      methods: z.array(z.enum(["CARD", "PIX"])).min(1).optional().describe("Padrão: CARD."),
+      methods: z.array(subscriptionMethod).min(1).optional().describe("Padrão: CARD."),
       returnUrl: z.string().url().optional(),
       completionUrl: z.string().url().optional(),
       customerId: z.string().optional(),
-      coupons: z.array(z.string()).max(50).optional(),
+      coupons: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe(
+          "Códigos de cupom. Em assinatura o cliente só consegue aplicar cupom quando methods é só CARD e o produto não tem trial; com PIX o campo de cupom não aparece."
+        ),
       externalId: z.string().optional(),
       upSellProductId: z.string().optional(),
       card: z.object({ maxInstallments: z.number().int().min(1).max(12) }).strict().optional(),
-      interest: feeValue.optional(),
-      fine: z.object({ value: z.number().min(0), type: z.enum(["FIXED", "PERCENTAGE"]) }).strict().optional(),
-      dueDate: z.string().optional().describe("YYYY-MM-DD"),
       retryPolicy: retryPolicy
         .optional()
         .describe("Política de novas tentativas em caso de falha de cobrança."),
@@ -66,9 +61,6 @@ export function registerSubscriptionTools(server: McpServer) {
         if (p.externalId) body.externalId = p.externalId;
         if (p.upSellProductId) body.upSellProductId = p.upSellProductId;
         if (p.card) body.card = p.card;
-        if (p.interest) body.interest = p.interest;
-        if (p.fine) body.fine = p.fine;
-        if (p.dueDate) body.dueDate = p.dueDate;
         if (p.retryPolicy) body.retryPolicy = p.retryPolicy;
         if (p.metadata) body.metadata = p.metadata;
 
@@ -81,7 +73,14 @@ export function registerSubscriptionTools(server: McpServer) {
         });
         const d = res.data;
         return {
-          content: [{ type: "text", text: `Assinatura criada: ${d.id}\n${d.url}\nstatus: ${d.status}` }],
+          content: [
+            {
+              type: "text",
+              text:
+                `Checkout de assinatura criado: ${d.id}\n${d.url}\nstatus: ${d.status}\n` +
+                `A assinatura (subs_...) é criada quando o cliente pagar. Depois, use listSubscriptions com checkoutId="${d.id}".`,
+            },
+          ],
         };
       } catch (e) {
         return toolError(e);
@@ -91,13 +90,14 @@ export function registerSubscriptionTools(server: McpServer) {
 
   server.tool(
     "listSubscriptions",
-    "Lista assinaturas. Observação: a API aplica apenas `status` e o intervalo `startDate`/`endDate`; `before`/`after`/`limit` controlam a paginação.",
+    "Lista assinaturas (subs_...): as que nasceram de um checkout de assinatura pago. Para listar os checkouts de assinatura (bill_...), use listSubscriptionCheckouts.",
     {
       apiKey: apiKeyParam(),
       after: z.string().optional(),
       before: z.string().optional(),
       limit: z.number().min(1).max(100).optional(),
-      status: subscriptionStatus.optional(),
+      status: z.enum(["ACTIVE", "CANCELLED"]).optional(),
+      checkoutId: z.string().optional().describe("Só as assinaturas geradas por este checkout (bill_...)."),
       startDate: z.string().optional().describe("YYYY-MM-DD"),
       endDate: z.string().optional().describe("YYYY-MM-DD"),
     },
@@ -110,6 +110,7 @@ export function registerSubscriptionTools(server: McpServer) {
             before: p.before,
             limit: p.limit,
             status: p.status,
+            checkoutId: p.checkoutId,
             startDate: p.startDate,
             endDate: p.endDate,
           })}`,
@@ -118,7 +119,13 @@ export function registerSubscriptionTools(server: McpServer) {
           method: "GET",
         });
         const rows =
-          res.data?.map((b: any, i: number) => `${i + 1}. ${b.id} — ${b.status}`).join("\n") || "Nenhuma.";
+          res.data
+            ?.map(
+              (s: any, i: number) =>
+                `${i + 1}. ${s.id} — ${s.status} — ${reais(s.amount)} — ${s.method} — cliente ${s.customerId} — ` +
+                `checkout ${s.checkoutId ?? "—"} — próxima cobrança ${s.nextChargeAt ?? "—"}`
+            )
+            .join("\n") || "Nenhuma.";
         return { content: [{ type: "text", text: `${rows}${paginationHint(res.pagination)}` }] };
       } catch (e) {
         return toolError(e);
@@ -128,19 +135,48 @@ export function registerSubscriptionTools(server: McpServer) {
 
   server.tool(
     "getSubscription",
-    "Busca uma assinatura por id, externalId, customerId ou method.",
+    "Busca uma assinatura (subs_...) por id, pelo externalId do checkout que a originou ou por customerId.",
     {
       apiKey: apiKeyParam(),
-      id: z.string().optional(),
-      externalId: z.string().optional(),
+      id: z.string().optional().describe("ID da assinatura (subs_...)."),
+      externalId: z.string().optional().describe("externalId do checkout de assinatura que a originou."),
       customerId: z.string().optional(),
-      method: z.enum(["PIX", "CRYPTO", "CARD", "BOLETO"]).optional(),
     },
     async (params, extra) => {
       const p = params as any;
       try {
         const res = await makeAbacatePayRequest<any>({
           path: `/subscriptions/get${buildQuery({
+            id: p.id,
+            externalId: p.externalId,
+            customerId: p.customerId,
+          })}`,
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "GET",
+        });
+        return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "getSubscriptionCheckout",
+    "Busca um checkout de assinatura (bill_..., o que createSubscription devolve) por id, externalId, customerId ou method.",
+    {
+      apiKey: apiKeyParam(),
+      id: z.string().optional().describe("ID do checkout de assinatura (bill_...)."),
+      externalId: z.string().optional(),
+      customerId: z.string().optional(),
+      method: subscriptionMethod.optional(),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          path: `/subscriptions/checkouts/get${buildQuery({
             id: p.id,
             externalId: p.externalId,
             customerId: p.customerId,
@@ -151,6 +187,79 @@ export function registerSubscriptionTools(server: McpServer) {
           method: "GET",
         });
         return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "listSubscriptionCheckouts",
+    "Lista checkouts de assinatura (bill_...). Para as assinaturas geradas por eles (subs_...), use listSubscriptions.",
+    {
+      apiKey: apiKeyParam(),
+      after: z.string().optional(),
+      before: z.string().optional(),
+      limit: z.number().min(1).max(100).optional(),
+      id: z.string().optional(),
+      keyword: z.string().optional(),
+      status: checkoutStatus.optional(),
+      customerId: z.string().optional(),
+      externalId: z.string().optional(),
+      method: subscriptionMethod.optional(),
+      startDate: z.string().optional().describe("YYYY-MM-DD"),
+      endDate: z.string().optional().describe("YYYY-MM-DD"),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          path: `/subscriptions/checkouts/list${buildQuery({
+            after: p.after,
+            before: p.before,
+            limit: p.limit,
+            id: p.id,
+            keyword: p.keyword,
+            status: p.status,
+            customerId: p.customerId,
+            externalId: p.externalId,
+            method: p.method,
+            startDate: p.startDate,
+            endDate: p.endDate,
+          })}`,
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "GET",
+        });
+        const rows =
+          res.data
+            ?.map((b: any, i: number) => `${i + 1}. ${b.id} — ${b.status} — ${reais(b.amount)} — ${b.url}`)
+            .join("\n") || "Nenhum checkout de assinatura.";
+        return { content: [{ type: "text", text: `${rows}${paginationHint(res.pagination)}` }] };
+      } catch (e) {
+        return toolError(e);
+      }
+    }
+  );
+
+  server.tool(
+    "deleteSubscriptionCheckout",
+    "Exclui um checkout de assinatura (bill_...): o link deixa de aceitar novas assinaturas. As assinaturas já geradas por ele continuam ativas; para encerrar uma, use cancelSubscription.",
+    {
+      apiKey: apiKeyParam(),
+      id: z.string().describe("ID do checkout de assinatura (bill_...)."),
+    },
+    async (params, extra) => {
+      const p = params as any;
+      try {
+        const res = await makeAbacatePayRequest<any>({
+          path: `/subscriptions/checkouts/delete${buildQuery({ id: p.id })}`,
+          apiKey: p.apiKey,
+          sessionId: extra.sessionId,
+          method: "POST",
+          body: "{}",
+        });
+        return { content: [{ type: "text", text: `Checkout de assinatura removido: ${res.data?.id ?? p.id}` }] };
       } catch (e) {
         return toolError(e);
       }
