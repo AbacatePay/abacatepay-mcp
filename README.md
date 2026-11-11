@@ -110,6 +110,22 @@ fly secrets set OAUTH_ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 Isso já está configurado em `fly.toml` (`OAUTH_DB_PATH=/data/oauth.db`, montado no volume `oauth_data`). Localmente, se `OAUTH_ENCRYPTION_KEY` não estiver definida, uma chave é gerada e persistida ao lado do banco (`oauth.key`), com aviso no console.
 
+**Imagem Docker:** cada push na `main` publica `ghcr.io/abacatepay/abacatepay-mcp:main` (e `:sha-<commit>`), com atestado de proveniência. Pra conferir que a imagem saiu deste repositório:
+
+```bash
+gh attestation verify oci://ghcr.io/abacatepay/abacatepay-mcp:main -R AbacatePay/abacatepay-mcp
+```
+
+Pra rodar, gere a chave de criptografia uma vez (`openssl rand -hex 32`), guarde e passe sempre a mesma: trocar a chave invalida todos os tokens emitidos. O banco fica no volume montado em `/data`. A imagem também roda sem root (`--user 1000:1000`, o usuário `bun`), desde que o volume pertença a esse usuário.
+
+```bash
+docker run -p 3000:3000 -v abacatepay-mcp:/data \
+  -e OAUTH_DB_PATH=/data/oauth.db \
+  -e OAUTH_ENCRYPTION_KEY="$OAUTH_ENCRYPTION_KEY" \
+  -e MCP_PUBLIC_URL=https://mcp.seudominio.com \
+  ghcr.io/abacatepay/abacatepay-mcp:main
+```
+
 ---
 
 ## Ferramentas
